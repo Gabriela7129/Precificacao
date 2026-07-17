@@ -4,7 +4,18 @@ import { Toaster } from 'sonner'
 import { AppShell } from './components/layout/AppShell'
 import { RequireAuth, RequireWorkspace } from './router/guards'
 import { LoginPage } from './features/auth/LoginPage'
-import { PlaceholderPage } from './pages/PlaceholderPage'
+import { OnboardingWorkspacePage, OnboardingConvitesPage } from './features/onboarding'
+import { ConfiguracoesPage } from './features/configuracoes'
+import { MateriaisLevesPage, AtivosPesadosPage } from './features/materiais-ativos'
+import { InsumosPage } from './features/insumos'
+import { ComponentesPage, ComponenteNovoPage, ComponenteDetalhePage } from './features/componentes'
+import {
+  ProdutosPage,
+  ProdutoNovoPage,
+  ProdutoDetalhePage,
+  ProdutoEditarPage,
+  ProdutosArquivadosPage,
+} from './features/produtos'
 import { useAuthStore } from './stores/authStore'
 import { useWorkspaceStore } from './stores/workspaceStore'
 
@@ -48,7 +59,7 @@ export default function App() {
           path="/onboarding/workspace"
           element={
             <RequireAuth>
-              <PlaceholderPage nome="Criar workspace" />
+              <OnboardingWorkspacePage />
             </RequireAuth>
           }
         />
@@ -56,7 +67,7 @@ export default function App() {
           path="/onboarding/convites"
           element={
             <RequireAuth>
-              <PlaceholderPage nome="Convidar membros" />
+              <OnboardingConvitesPage />
             </RequireAuth>
           }
         />
@@ -71,18 +82,18 @@ export default function App() {
             </RequireAuth>
           }
         >
-          <Route path="/configuracoes" element={<PlaceholderPage nome="Configurações" />} />
-          <Route path="/materiais-leves" element={<PlaceholderPage nome="Materiais Leves" />} />
-          <Route path="/ativos-pesados" element={<PlaceholderPage nome="Ativos Pesados" />} />
-          <Route path="/insumos" element={<PlaceholderPage nome="Insumos" />} />
-          <Route path="/componentes" element={<PlaceholderPage nome="Componentes Semi-Acabados" />} />
-          <Route path="/componentes/novo" element={<PlaceholderPage nome="Novo componente" />} />
-          <Route path="/componentes/:id" element={<PlaceholderPage nome="Componente" />} />
-          <Route path="/produtos" element={<PlaceholderPage nome="Produtos Finais" />} />
-          <Route path="/produtos/arquivados" element={<PlaceholderPage nome="Produtos Arquivados" />} />
-          <Route path="/produtos/novo" element={<PlaceholderPage nome="Novo produto" />} />
-          <Route path="/produtos/:id" element={<PlaceholderPage nome="Produto" />} />
-          <Route path="/produtos/:id/editar" element={<PlaceholderPage nome="Editar produto" />} />
+          <Route path="/configuracoes" element={<ConfiguracoesPage />} />
+          <Route path="/materiais-leves" element={<MateriaisLevesPage />} />
+          <Route path="/ativos-pesados" element={<AtivosPesadosPage />} />
+          <Route path="/insumos" element={<InsumosPage />} />
+          <Route path="/componentes" element={<ComponentesPage />} />
+          <Route path="/componentes/novo" element={<ComponenteNovoPage />} />
+          <Route path="/componentes/:id" element={<ComponenteDetalhePage />} />
+          <Route path="/produtos" element={<ProdutosPage />} />
+          <Route path="/produtos/arquivados" element={<ProdutosArquivadosPage />} />
+          <Route path="/produtos/novo" element={<ProdutoNovoPage />} />
+          <Route path="/produtos/:id" element={<ProdutoDetalhePage />} />
+          <Route path="/produtos/:id/editar" element={<ProdutoEditarPage />} />
         </Route>
 
         {/* Fallback */}
