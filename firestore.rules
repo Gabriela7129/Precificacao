@@ -28,7 +28,13 @@ service cloud.firestore {
     }
 
     match /workspaces/{workspaceId} {
-      allow read: if isMember(workspaceId);
+      // GET (documento único): pode usar get()/exists() normalmente.
+      allow get: if isMember(workspaceId);
+      // LIST (consultas): regras NÃO são filtros — a consulta precisa ser
+      // provavelmente segura apenas com os dados do próprio documento.
+      // Por isso usamos resource.data.memberIds aqui (a query do app já
+      // filtra com array-contains no mesmo campo).
+      allow list: if isSignedIn() && request.auth.uid in resource.data.memberIds;
       allow create: if isSignedIn()
         && request.resource.data.ownerId == request.auth.uid
         && request.auth.uid in request.resource.data.memberIds;
