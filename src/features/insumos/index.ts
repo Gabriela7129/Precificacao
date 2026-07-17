@@ -1,0 +1,1 @@
+export { InsumosPage } from './InsumosPage'
