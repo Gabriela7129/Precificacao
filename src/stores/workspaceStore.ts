@@ -12,6 +12,8 @@ interface WorkspaceState {
   activeWorkspace: WithId<Workspace> | null
   /** true enquanto carrega os workspaces do usuário. */
   loading: boolean
+  /** Mensagem de erro da última carga (ex.: permissão negada no Firestore). */
+  error: string | null
   /** Carrega os workspaces do usuário e define o ativo. */
   loadForUser: (uid: string) => Promise<void>
   setActiveWorkspace: (workspaceId: string) => void
@@ -23,18 +25,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   activeWorkspace: null,
   loading: true,
+  error: null,
 
   loadForUser: async (uid) => {
-    set({ loading: true })
-    const q = query(collection(db, 'workspaces'), where('memberIds', 'array-contains', uid))
-    const snap = await getDocs(q)
-    const workspaces = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Workspace) }))
+    set({ loading: true, error: null })
+    try {
+      const q = query(collection(db, 'workspaces'), where('memberIds', 'array-contains', uid))
+      const snap = await getDocs(q)
+      const workspaces = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Workspace) }))
 
-    const savedId = localStorage.getItem(STORAGE_KEY)
-    const active =
-      workspaces.find((w) => w.id === savedId) ?? workspaces[0] ?? null
+      const savedId = localStorage.getItem(STORAGE_KEY)
+      const active =
+        workspaces.find((w) => w.id === savedId) ?? workspaces[0] ?? null
 
-    set({ workspaces, activeWorkspace: active, loading: false })
+      set({ workspaces, activeWorkspace: active, loading: false })
+    } catch (err) {
+      console.error('[workspace] Falha ao carregar workspaces:', err)
+      const message =
+        err instanceof Error ? err.message : 'Erro desconhecido ao acessar o banco de dados.'
+      set({ workspaces: [], activeWorkspace: null, loading: false, error: message })
+    }
   },
 
   setActiveWorkspace: (workspaceId) => {
@@ -47,6 +57,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   reset: () => {
     localStorage.removeItem(STORAGE_KEY)
-    set({ workspaces: [], activeWorkspace: null, loading: true })
+    set({ workspaces: [], activeWorkspace: null, loading: true, error: null })
   },
 }))
