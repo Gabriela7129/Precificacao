@@ -1,0 +1,62 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Um usuário é membro de um workspace se seu uid está no array memberIds
+    // do documento do workspace (espelho da subcoleção members, usado para
+    // queries e regras).
+    function isMember(workspaceId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/workspaces/$(workspaceId))
+        && request.auth.uid in get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.memberIds;
+    }
+
+    // Verifica membership a partir do campo workspaceId de um documento.
+    function isWorkspaceDoc(data) {
+      return isSignedIn() && 'workspaceId' in data && isMember(data.workspaceId);
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && request.auth.uid == uid;
+      allow delete: if false;
+    }
+
+    match /workspaces/{workspaceId} {
+      allow read: if isMember(workspaceId);
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.auth.uid in request.resource.data.memberIds;
+      allow update, delete: if isMember(workspaceId);
+
+      match /members/{memberId} {
+        // Leitura: membros do workspace, ou o próprio usuário lendo seu
+        // registro (usado pela query "em quais workspaces estou?").
+        allow read: if isMember(workspaceId)
+          || (isSignedIn() && resource.data.userId == request.auth.uid);
+        allow create: if isSignedIn()
+          && (isMember(workspaceId) || request.resource.data.userId == request.auth.uid);
+        allow update, delete: if isMember(workspaceId);
+      }
+    }
+
+    // Todas as coleções de dados são escopadas por workspaceId.
+    match /{collectionName}/{docId} {
+      allow read, update, delete: if collectionName in [
+          'settings', 'lightTools', 'heavyAssets', 'supplyCategories',
+          'supplies', 'supplyEntries', 'marketplaces',
+          'semiFinishedComponents', 'products'
+        ] && isWorkspaceDoc(resource.data);
+      allow create: if collectionName in [
+          'settings', 'lightTools', 'heavyAssets', 'supplyCategories',
+          'supplies', 'supplyEntries', 'marketplaces',
+          'semiFinishedComponents', 'products'
+        ] && isWorkspaceDoc(request.resource.data);
+    }
+  }
+}

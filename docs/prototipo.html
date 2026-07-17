@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Precificador de Artesanato - Protótipo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            rose: {
+              50: '#fff1f2',
+              100: '#ffe4e6',
+              200: '#fecdd3',
+              300: '#fda4af',
+              400: '#fb7185',
+              500: '#f43f5e',
+              600: '#e11d48',
+              700: '#be123c',
+              800: '#9f1239',
+              900: '#881337',
+            },
+            amber: {
+              50: '#fffbeb',
+              100: '#fef3c7',
+              200: '#fde68a',
+              300: '#fcd34d',
+              400: '#fbbf24',
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309',
+              800: '#92400e',
+              900: '#78350f',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .screen { display: none; }
+    .screen.active { display: flex; }
+    .section { display: none; }
+    .section.active { display: block; }
+  </style>
+</head>
+<body class="bg-amber-50 text-gray-800 font-sans antialiased">
+
+<!-- TELA 1: LOGIN -->
+<section id="login" class="screen active min-h-screen flex-col items-center justify-center p-6">
+  <div class="w-full max-w-sm bg-white p-8 rounded-3xl shadow-lg border border-rose-200 text-center">
+    <div class="w-20 h-20 bg-gradient-to-br from-rose-400 to-amber-300 rounded-2xl mx-auto mb-6 flex items-center justify-center text-white text-3xl font-bold shadow-md">P</div>
+    <h1 class="text-2xl font-bold mb-2 text-gray-900">Precificador</h1>
+    <p class="text-gray-500 mb-8">Cálculo de custos para artesanato</p>
+    <button onclick="show('workspace-create')" class="w-full flex items-center justify-center gap-3 bg-white border border-rose-200 hover:bg-rose-50 text-gray-700 font-medium py-3 px-4 rounded-xl transition">
+      <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Entrar com Google
+    </button>
+  </div>
+</section>
+
+<!-- TELA 2: CRIAR WORKSPACE -->
+<section id="workspace-create" class="screen min-h-screen flex-col items-center justify-center p-6">
+  <div class="w-full max-w-md bg-white p-8 rounded-3xl shadow-lg border border-rose-200">
+    <h2 class="text-xl font-bold mb-2 text-gray-900">Criar workspace</h2>
+    <p class="text-gray-500 mb-6">Nome do ateliê ou empresa</p>
+    <label class="block text-sm font-medium text-gray-700 mb-2">Nome do workspace</label>
+    <input type="text" value="Ateliê Gabi" class="w-full border border-rose-200 bg-amber-50 rounded-xl px-4 py-3 mb-6 focus:outline-none focus:ring-2 focus:ring-rose-400">
+    <button onclick="show('invite-members')" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-medium py-3 px-4 rounded-xl transition shadow-md">Continuar</button>
+  </div>
+</section>
+
+<!-- TELA 3: CONVIDAR MEMBROS -->
+<section id="invite-members" class="screen min-h-screen flex-col items-center justify-center p-6">
+  <div class="w-full max-w-md bg-white p-8 rounded-3xl shadow-lg border border-rose-200">
+    <h2 class="text-xl font-bold mb-2 text-gray-900">Convidar membros</h2>
+    <p class="text-gray-500 mb-6">Adicione contas pessoais para colaborar. Neste primeiro momento, todos terão perfil de administrador.</p>
+
+    <div class="space-y-3 mb-4">
+      <div class="flex gap-2">
+        <input type="email" placeholder="email@exemplo.com" class="flex-1 border border-rose-200 bg-amber-50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-rose-400">
+        <select disabled class="border border-rose-200 rounded-xl px-3 py-3 text-sm bg-gray-100 text-gray-500">
+          <option>Administrador</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="text-rose-500 text-sm font-medium mb-8 flex items-center gap-1 hover:text-rose-600">
+      <span class="text-lg">+</span> Adicionar outro e-mail
+    </button>
+
+    <div class="flex gap-3">
+      <button onclick="show('dashboard')" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-medium py-3 px-4 rounded-xl transition shadow-md">Criar workspace</button>
+      <button onclick="show('dashboard')" class="flex-1 bg-white border border-rose-200 hover:bg-rose-50 text-gray-700 font-medium py-3 px-4 rounded-xl transition">Pular</button>
+    </div>
+  </div>
+</section>
+
+<!-- TELA 4: DASHBOARD COM SIDEBAR -->
+<section id="dashboard" class="screen min-h-screen">
+  <div class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-rose-200 flex flex-col flex-shrink-0">
+      <div class="p-5 border-b border-rose-200 flex items-center gap-3">
+        <div class="w-9 h-9 bg-gradient-to-br from-rose-400 to-amber-300 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm flex-shrink-0">P</div>
+        <span class="font-bold text-gray-900 whitespace-nowrap">Ateliê Gabi</span>
+      </div>
+      <nav class="flex-1 p-3 space-y-1">
+        <button onclick="showSection('config')" class="nav-item w-full text-left px-4 py-3 rounded-xl bg-rose-100 text-rose-700 font-medium flex items-center gap-3 transition">
+          <span class="text-xl">⚙️</span>
+          <span class="whitespace-nowrap">Configurações</span>
+        </button>
+        <button onclick="showSection('lightTools')" class="nav-item w-full text-left px-4 py-3 rounded-xl hover:bg-amber-100 text-gray-700 flex items-center gap-3 transition">
+          <span class="text-xl">🪡</span>
+          <span class="whitespace-nowrap">Materiais Leves</span>
+        </button>
+        <button onclick="showSection('assets')" class="nav-item w-full text-left px-4 py-3 rounded-xl hover:bg-amber-100 text-gray-700 flex items-center gap-3 transition">
+          <span class="text-xl">⚡</span>
+          <span class="whitespace-nowrap">Ativos Pesados</span>
+        </button>
+        <button onclick="showSection('supplies')" class="nav-item w-full text-left px-4 py-3 rounded-xl hover:bg-amber-100 text-gray-700 flex items-center gap-3 transition">
+          <span class="text-xl">📦</span>
+          <span class="whitespace-nowrap">Insumos</span>
+        </button>
+        <button onclick="showSection('components')" class="nav-item w-full text-left px-4 py-3 rounded-xl hover:bg-amber-100 text-gray-700 flex items-center gap-3 transition">
+          <span class="text-xl">🔧</span>
+          <span class="whitespace-nowrap">Componentes</span>
+        </button>
+        <button onclick="showSection('products')" class="nav-item w-full text-left px-4 py-3 rounded-xl hover:bg-amber-100 text-gray-700 flex items-center gap-3 transition">
+          <span class="text-xl">🏷️</span>
+          <span class="whitespace-nowrap">Produtos</span>
+        </button>
+      </nav>
+      <div class="p-4 border-t border-rose-200">
+        <div class="flex items-center gap-3 px-4 py-2">
+          <div class="w-8 h-8 rounded-full bg-amber-200 flex-shrink-0"></div>
+          <div class="text-sm overflow-hidden">
+            <p class="font-medium text-gray-900 truncate">gabi@email.com</p>
+            <p class="text-gray-500">Administrador</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-8">
+
+      <!-- CONFIGURAÇÕES -->
+      <div id="config" class="section active">
+        <h2 class="text-2xl font-bold mb-6 text-gray-900">Configurações</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white p-6 rounded-3xl shadow-sm border border-rose-200">
+            <h3 class="font-semibold mb-4 text-gray-900">Perfil financeiro</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Salário líquido desejado/mês</label>
+                <input type="text" value="R$ 4.500,00" class="w-full border border-rose-200 bg-amber-50 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Horas produtivas/semana</label>
+                <input type="text" value="30" class="w-full border border-rose-200 bg-amber-50 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400">
+              </div>
+              <div class="flex gap-4">
+                <div class="flex-1">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Hora Operacional</label>
+                  <input type="text" value="R$ 34,62" class="w-full border border-rose-200 bg-amber-50 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400">
+                </div>
+                <div class="flex-1">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Hora Criativa</label>
+                  <input type="text" value="R$ 45,00" class="w-full border border-rose-200 bg-amber-50 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400">
+                </div>
+              </div>
+              <button class="bg-rose-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-600 shadow-sm">Recalcular</button>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-3xl shadow-sm border border-rose-200">
+            <h3 class="font-semibold mb-4 text-gray-900">Custos ocultos</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Taxa de manutenção leve (%)</label>
+                <input type="text" value="7%" class="w-full border border-rose-200 bg-amber-50 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400">
+                <p class="text-xs text-gray-500 mt-1">Aplicada sobre o valor de cada material leve</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Tarifa de energia (R$/kWh)</label>
+                <input type="text" value="R$ 0,85" class="w-full border border-rose-200 bg-amber-50 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400">
+                <p class="text-xs text-gray-500 mt-1">Deixe em branco se não quiser calcular energia</p>
+              </div>
+              <button class="bg-rose-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-600 shadow-sm">Salvar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Marketplaces -->
+        <div class="mt-6 bg-white p-6 rounded-3xl shadow-sm border border-rose-200">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold text-gray-900">Marketplaces</h3>
+            <button class="text-rose-500 text-sm font-medium hover:text-rose-600">+ Adicionar marketplace</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="border border-rose-200 rounded-2xl p-4 bg-amber-50 hover:bg-amber-100 cursor-pointer transition">
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-medium">Shopee</span>
+                <span class="text-xs bg-amber-300 text-amber-900 px-2 py-1 rounded-full">Padrão</span>
+              </div>
+              <p class="text-sm text-gray-600">Taxa: 20% + R$ 4,00</p>
+              <div class="mt-3 flex gap-2">
+                <button class="text-xs text-rose-500 hover:text-rose-700 font-medium">Editar</button>
+                <button class="text-xs text-gray-400 hover:text-gray-600 font-medium">Excluir</button>
+              </div>
+            </div>
+            <div class="border border-rose-200 rounded-2xl p-4 bg-amber-50 hover:bg-amber-100 cursor-pointer transition">
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-medium">Mercado Livre</span>
+              </div>
+              <p class="text-sm text-gray-600">Taxa: 20%</p>
+              <div class="mt-3 flex gap-2">
+                <button class="text-xs text-rose-500 hover:text-rose-700 font-medium">Editar</button>
+                <button class="text-xs text-gray-400 hover:text-gray-600 font-medium">Excluir</button>
+              </div>
+            </div>
+            <div class="border border-rose-200 rounded-2xl p-4 bg-amber-50 hover:bg-amber-100 cursor-pointer transition">
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-medium">Nuvemshop</span>
+              </div>
+              <p class="text-sm text-gray-600">Taxa: 1%</p>
+              <div class="mt-3 flex gap-2">
+                <button class="text-xs text-rose-500 hover:text-rose-700 font-medium">Editar</button>
+                <button class="text-xs text-gray-400 hover:text-gray-600 font-medium">Excluir</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MATERIAIS LEVES -->
+      <div id="lightTools" class="section">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-gray-900">Materiais Leves</h2>
+          <button class="bg-rose-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-600 shadow-sm">+ Novo material</button>
+        </div>
+
+        <div class="mb-4">
+          <input type="text" placeholder="Buscar material leve..." class="w-full max-w-md border border-rose-200 bg-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400">
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm border border-rose-200 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-amber-100">
+              <tr>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Nome</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Valor pago</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Data compra</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Manut. mensal</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Status</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Ações</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-rose-100">
+              <tr class="hover:bg-rose-50 cursor-pointer">
+                <td class="px-6 py-4">Tesoura de precisão</td>
+                <td class="px-6 py-4">R$ 45,00</td>
+                <td class="px-6 py-4">10/01/2026</td>
+                <td class="px-6 py-4">R$ 3,15</td>
+                <td class="px-6 py-4"><span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Ativo</span></td>
+                <td class="px-6 py-4"><button class="text-rose-500 hover:text-rose-700 text-xs font-medium">Editar</button></td>
+              </tr>
+              <tr class="hover:bg-rose-50 cursor-pointer">
+                <td class="px-6 py-4">Agulhas #10</td>
+                <td class="px-6 py-4">R$ 18,00</td>
+                <td class="px-6 py-4">15/02/2026</td>
+                <td class="px-6 py-4">R$ 1,26</td>
+                <td class="px-6 py-4"><span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Ativo</span></td>
+                <td class="px-6 py-4"><button class="text-rose-500 hover:text-rose-700 text-xs font-medium">Editar</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ATIVOS PESADOS -->
+      <div id="assets" class="section">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-gray-900">Ativos Pesados</h2>
+          <button class="bg-rose-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-600 shadow-sm">+ Novo ativo</button>
+        </div>
+
+        <div class="mb-4">
+          <input type="text" placeholder="Buscar ativo..." class="w-full max-w-md border border-rose-200 bg-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400">
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm border border-rose-200 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-amber-100">
+              <tr>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Nome</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Valor</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Data compra</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Depreciação/hora</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Energia/hora</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Total/hora</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Ações</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-rose-100">
+              <tr class="hover:bg-rose-50 cursor-pointer">
+                <td class="px-6 py-4">Máquina de corte</td>
+                <td class="px-6 py-4">R$ 2.800,00</td>
+                <td class="px-6 py-4">05/03/2025</td>
+                <td class="px-6 py-4">R$ 1,95</td>
+                <td class="px-6 py-4">R$ 0,34</td>
+                <td class="px-6 py-4 font-medium">R$ 2,29</td>
+                <td class="px-6 py-4"><button class="text-rose-500 hover:text-rose-700 text-xs font-medium">Editar</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- INSUMOS -->
+      <div id="supplies" class="section">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-gray-900">Insumos</h2>
+          <div class="flex gap-3">
+            <button class="bg-white border border-rose-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium hover:bg-amber-100">+ Entrada</button>
+            <button class="bg-rose-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-600 shadow-sm">+ Novo insumo</button>
+          </div>
+        </div>
+        <div class="flex gap-3 mb-4">
+          <input type="text" placeholder="Buscar insumo..." class="flex-1 border border-rose-200 bg-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400">
+          <select class="border border-rose-200 bg-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400">
+            <option>Todas as categorias</option>
+            <option>Papéis</option>
+            <option>Fios e linhas</option>
+            <option>Cola</option>
+            <option>Tecidos</option>
+            <option>Ferragens</option>
+            <option>Embalagens</option>
+            <option>Tinta e vernizes</option>
+            <option>Laminações</option>
+          </select>
+        </div>
+        <div class="bg-white rounded-3xl shadow-sm border border-rose-200 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-amber-100">
+              <tr>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Nome</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Categoria</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Estoque</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Custo médio</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Última compra</th>
+                <th class="text-left px-6 py-3 font-medium text-gray-600">Ações</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-rose-100">
+              <tr class="hover:bg-rose-50 cursor-pointer">
+                <td class="px-6 py-4">Papel Color Plus 180g</td>
+                <td class="px-6 py-4"><span class="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full">Papéis</span></td>
+                <td class="px-6 py-4">250 folhas</td>
+                <td class="px-6 py-4">R$ 0,18</td>
+                <td class="px-6 py-4">10/07/2026</td>
+                <td class="px-6 py-4"><button class="text-rose-500 hover:text-rose-700 text-xs font-medium">Editar</button></td>
+              </tr>
+              <tr class="hover:bg-rose-50 cursor-pointer">
+                <td class="px-6 py-4">Linha de cera</td>
+                <td class="px-6 py-4"><span class="bg-rose-100 text-rose-700 text-xs px-2 py-1 rounded-full">Fios e linhas</span></td>
+                <td class="px-6 py-4">80 m</td>
+                <td class="px-6 py-4">R$ 0,12</td>
+                <td class="px-6 py-4">02/06/2026</td>
+                <td class="px-6 py-4"><button class="text-rose-500 hover:text-rose-700 text-xs font-medium">Editar</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- COMPONENTES -->
+      <div id="components" class="section">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-gray-900">Componentes Semi-Acabados</h2>
+          <button class="bg-rose-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-600 shadow-sm">+ Novo componente</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div class="bg-white p-6 rounded-3xl shadow-sm border border-rose-200 cursor-pointer hover:shadow-md transition">
+            <h3 class="font-semibold text-lg mb-1 text-gray-900">Miolo A5 Costurado</h3>
+            <p class="text-sm text-gray-500 mb-4">2 insumos · 1 ativo · 20 min</p>
+            <div class="flex justify-between items-end">
+              <span class="text-gray-600 text-sm">Custo unitário</span>
+              <span class="text-2xl font-bold text-rose-500">R$ 8,40</span>
+            </div>
+          </div>
+          <div class="bg-white p-6 rounded-3xl shadow-sm border border-rose-200 cursor-pointer hover:shadow-md transition">
+            <h3 class="font-semibold text-lg mb-1 text-gray-900">Capa Dura Revestida</h3>
+            <p class="text-sm text-gray-500 mb-4">4 insumos · 0 ativos · 45 min</p>
+            <div class="flex justify-between items-end">
+              <span class="text-gray-600 text-sm">Custo unitário</span>
+              <span class="text-2xl font-bold text-rose-500">R$ 14,20</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRODUTOS -->
+      <div id="products" class="section">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-gray-900">Produtos Finais</h2>
+          <div class="flex gap-3">
+            <button onclick="showSection('archived-products')" class="bg-white border border-rose-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium hover:bg-amber-100">📁 Arquivados</button>
+            <button class="bg-rose-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-rose-600 shadow-sm">+ Novo produto</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white p-6 rounded-3xl shadow-sm border border-rose-200 cursor-pointer hover:shadow-md transition" onclick="showProductDetail()">
+            <div class="flex justify-between items-start mb-4">
+              <div>
+                <h3 class="font-semibold text-lg text-gray-900">Caderno A5 Costurado</h3>
+                <p class="text-sm text-gray-500">v1 · criado em 12/07/2026</p>
+              </div>
+              <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Ativo</span>
+            </div>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between"><span class="text-gray-600">Custo direto</span><span class="font-medium">R$ 31,75</span></div>
+              <div class="flex justify-between"><span class="text-gray-600">Margem</span><span class="font-medium">40%</span></div>
+              <div class="flex justify-between"><span class="text-gray-600">Preço sem taxas</span><span class="font-medium">R$ 44,45</span></div>
+              <div class="flex justify-between border-t border-rose-100 pt-2 mt-2"><span class="text-gray-600">Preço de venda</span><span class="text-xl font-bold text-rose-500">R$ 57,34</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRODUTOS ARQUIVADOS -->
+      <div id="archived-products" class="section">
+        <div class="flex items-center gap-3 mb-6">
+          <button onclick="showSection('products')" class="p-2 hover:bg-rose-100 rounded-lg text-gray-600">←</button>
+          <h2 class="text-2xl font-bold text-gray-900">Produtos Arquivados</h2>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white p-6 rounded-3xl shadow-sm border border-rose-200 opacity-70">
+            <div class="flex justify-between items-start mb-4">
+              <div>
+                <h3 class="font-semibold text-lg text-gray-900">Caderno A5 Costurado</h3>
+                <p class="text-sm text-gray-500">v0 · arquivado em 01/06/2026</p>
+              </div>
+              <span class="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">Arquivado</span>
+            </div>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between"><span class="text-gray-600">Custo direto</span><span class="font-medium">R$ 29,00</span></div>
+              <div class="flex justify-between"><span class="text-gray-600">Margem</span><span class="font-medium">40%</span></div>
+              <div class="flex justify-between"><span class="text-gray-600">Preço sem taxas</span><span class="font-medium">R$ 40,60</span></div>
+              <div class="flex justify-between border-t border-rose-100 pt-2 mt-2"><span class="text-gray-600">Preço de venda</span><span class="text-xl font-bold text-rose-500">R$ 52,61</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DETALHE DO PRODUTO -->
+      <div id="product-detail" class="section">
+        <div class="flex items-center gap-3 mb-6">
+          <button onclick="showSection('products')" class="p-2 hover:bg-rose-100 rounded-lg text-gray-600">←</button>
+          <h2 class="text-2xl font-bold text-gray-900">Caderno A5 Costurado</h2>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Coluna 1: Composição -->
+          <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-rose-200">
+              <h3 class="font-semibold mb-4 text-gray-900">Composição</h3>
+              <div class="space-y-3">
+                <div class="flex justify-between items-center p-3 bg-rose-50 rounded-xl">
+                  <div>
+                    <p class="font-medium">Miolo A5 Costurado</p>
+                    <p class="text-xs text-gray-500">Componente · 1 un</p>
+                  </div>
+                  <span class="font-medium">R$ 8,40</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-rose-50 rounded-xl">
+                  <div>
+                    <p class="font-medium">Capa Dura Revestida</p>
+                    <p class="text-xs text-gray-500">Componente · 1 un</p>
+                  </div>
+                  <span class="font-medium">R$ 14,20</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-rose-50 rounded-xl">
+                  <div>
+                    <p class="font-medium">Saco plástico PP</p>
+                    <p class="text-xs text-gray-500">Embalagem · 1 un</p>
+                  </div>
+                  <span class="font-medium">R$ 0,50</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-amber-50 rounded-xl">
+                  <div>
+                    <p class="font-medium">Acabamento final</p>
+                    <p class="text-xs text-gray-500">Operacional · 15 min</p>
+                  </div>
+                  <span class="font-medium">R$ 8,65</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-rose-200">
+              <h3 class="font-semibold mb-4 text-gray-900">Histórico de versões</h3>
+              <div class="space-y-2">
+                <div class="flex justify-between items-center p-3 border border-rose-200 rounded-xl">
+                  <div>
+                    <p class="font-medium">v1</p>
+                    <p class="text-xs text-gray-500">Criado em 12/07/2026</p>
+                  </div>
+                  <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Ativo</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Coluna 2: Precificação -->
+          <div class="space-y-6">
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-rose-200">
+              <h3 class="font-semibold mb-4 text-gray-900">Precificação</h3>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Margem de lucro (%)</label>
+                  <input type="text" value="40%" class="w-full border border-rose-200 bg-amber-50 rounded-xl px-4 py-2">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Marketplace</label>
+                  <select class="w-full border border-rose-200 bg-amber-50 rounded-xl px-4 py-2">
+                    <option>Shopee (20% + R$ 4,00)</option>
+                    <option>Mercado Livre (20%)</option>
+                    <option>Nuvemshop (1%)</option>
+                  </select>
+                </div>
+                <div class="border-t border-rose-100 pt-4 space-y-2">
+                  <div class="flex justify-between text-sm"><span class="text-gray-600">Custo direto</span><span class="font-medium">R$ 31,75</span></div>
+                  <div class="flex justify-between text-sm"><span class="text-gray-600">Margem</span><span class="font-medium">R$ 12,70</span></div>
+                  <div class="flex justify-between text-sm"><span class="text-gray-600">Preço sem taxas</span><span class="font-medium">R$ 44,45</span></div>
+                  <div class="flex justify-between text-sm"><span class="text-gray-600">Taxa do marketplace</span><span class="font-medium">R$ 12,89</span></div>
+                  <div class="flex justify-between text-lg font-bold pt-2 border-t border-rose-100">
+                    <span>Preço de venda</span>
+                    <span class="text-rose-500">R$ 57,34</span>
+                  </div>
+                  <div class="flex justify-between text-sm text-gray-500">
+                    <span>Valor líquido</span>
+                    <span>R$ 44,45</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-rose-200">
+              <h3 class="font-semibold mb-4 text-gray-900">Ações</h3>
+              <div class="space-y-2">
+                <button class="w-full bg-rose-500 text-white py-2 rounded-xl font-medium hover:bg-rose-600">Editar produto</button>
+                <button class="w-full bg-white border border-rose-200 text-gray-700 py-2 rounded-xl font-medium hover:bg-rose-50">Reavaliar custos</button>
+                <button class="w-full bg-white border border-rose-200 text-gray-700 py-2 rounded-xl font-medium hover:bg-rose-50">Arquivar versão</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</section>
+
+<script>
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+  function showSection(id) {
+    document.querySelectorAll('.section').forEach(el => {
+      el.classList.add('hidden');
+      el.classList.remove('active');
+    });
+    const target = document.getElementById(id);
+    target.classList.remove('hidden');
+    target.classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('bg-rose-100', 'text-rose-700', 'font-medium'));
+    if (event && event.currentTarget) {
+      event.currentTarget.classList.add('bg-rose-100', 'text-rose-700', 'font-medium');
+    }
+  }
+  function showProductDetail() {
+    showSection('product-detail');
+  }
+</script>
+
+</body>
+</html>
