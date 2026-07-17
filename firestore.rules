@@ -38,16 +38,33 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.ownerId == request.auth.uid
         && request.auth.uid in request.resource.data.memberIds;
-      allow update, delete: if isMember(workspaceId);
+      // UPDATE: membros podem tudo; um convidado pode APENAS se adicionar a
+      // memberIds (auto-join), e somente se existir convite pendente para o
+      // e-mail da conta Google dele (doc `members/invite_<email>`).
+      allow update: if isMember(workspaceId)
+        || (isSignedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
+          && request.auth.uid in request.resource.data.memberIds
+          && !(request.auth.uid in resource.data.memberIds)
+          && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$('invite_' + request.auth.token.email.lower())));
+      allow delete: if isMember(workspaceId);
 
       match /members/{memberId} {
-        // Leitura: membros do workspace, ou o próprio usuário lendo seu
-        // registro (usado pela query "em quais workspaces estou?").
-        allow read: if isMember(workspaceId)
+        // GET: membros do workspace, ou o próprio usuário lendo seu registro.
+        allow get: if isMember(workspaceId)
           || (isSignedIn() && resource.data.userId == request.auth.uid);
+        // LIST: membros do workspace listam tudo; qualquer usuário logado
+        // pode descobrir convites pendentes endereçados ao próprio e-mail
+        // (usado pela query collectionGroup "tenho convites?").
+        allow list: if isMember(workspaceId)
+          || (isSignedIn() && resource.data.email == request.auth.token.email.lower());
         allow create: if isSignedIn()
           && (isMember(workspaceId) || request.resource.data.userId == request.auth.uid);
-        allow update, delete: if isMember(workspaceId);
+        allow update: if isMember(workspaceId);
+        // DELETE: membros do workspace; ou o convidado removendo o próprio
+        // convite (usado ao aceitar o convite).
+        allow delete: if isMember(workspaceId)
+          || (isSignedIn() && resource.data.email == request.auth.token.email.lower());
       }
     }
 

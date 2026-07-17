@@ -125,7 +125,7 @@ export function OnboardingConvitesPage() {
       let added = 0
       let pending = 0
       for (const email of emails) {
-        const result = await inviteMemberByEmail(activeWorkspace.id, email, members)
+        const result = await inviteMemberByEmail(activeWorkspace.id, email, members, activeWorkspace.name)
         if (result === 'added') added += 1
         else if (result === 'pending') pending += 1
       }

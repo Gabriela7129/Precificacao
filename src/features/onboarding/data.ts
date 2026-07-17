@@ -106,6 +106,8 @@ export async function inviteMemberByEmail(
   workspaceId: string,
   email: string,
   currentMembers: MemberEntry[],
+  /** Nome do workspace, gravado no convite pendente para exibição ao convidado. */
+  workspaceName?: string,
 ): Promise<InviteResult> {
   const normalized = email.trim().toLowerCase()
   const uid = await findUserIdByEmail(normalized)
@@ -128,6 +130,7 @@ export async function inviteMemberByEmail(
     role: 'admin',
     status: 'pending',
     invitedAt: serverTimestamp(),
+    ...(workspaceName ? { workspaceName } : {}),
   })
   return 'pending'
 }
