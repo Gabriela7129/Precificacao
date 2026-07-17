@@ -1,10 +1,37 @@
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { TriangleAlert } from 'lucide-react'
+import { TriangleAlert, Lock } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useWorkspaceStore } from '../stores/workspaceStore'
+import { isEmailAllowed } from '../config/allowedEmails'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Button } from '../components/ui'
+
+/** Tela para contas fora da allowlist da equipe. */
+function BlockedScreen({ email }: { email: string | null }) {
+  const logout = useAuthStore((s) => s.logout)
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-amber-50 p-6">
+      <div className="w-full max-w-md bg-white rounded-3xl border border-rose-200 shadow-sm p-8 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-500 flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-7 h-7" />
+        </div>
+        <h1 className="text-lg font-bold text-gray-900 mb-2">Acesso restrito à equipe</h1>
+        <p className="text-sm text-gray-500 mb-4">
+          Este aplicativo é de uso interno do ateliê. A conta{' '}
+          <strong>{email ?? 'desconhecida'}</strong> não está na lista de e-mails autorizados.
+        </p>
+        <p className="text-sm text-gray-500 mb-6">
+          Se você deveria ter acesso, peça para a proprietária do ateliê confirmar o e-mail da sua
+          conta Google.
+        </p>
+        <Button variant="secondary" onClick={() => void logout()}>
+          Sair e trocar de conta
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 function FullScreenLoading() {
   return (
@@ -54,13 +81,14 @@ function WorkspaceErrorScreen({ message }: { message: string }) {
   )
 }
 
-/** Exige usuário autenticado; caso contrário → /login. */
+/** Exige usuário autenticado E autorizado; caso contrário → /login ou tela de bloqueio. */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuthStore()
   const location = useLocation()
 
   if (loading) return <FullScreenLoading />
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />
+  if (!isEmailAllowed(user.email)) return <BlockedScreen email={user.email} />
   return <>{children}</>
 }
 
