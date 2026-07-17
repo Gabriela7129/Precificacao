@@ -7,7 +7,7 @@ import { isEmailAllowed } from '../config/allowedEmails'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Button } from '../components/ui'
 
-/** Tela para contas fora da allowlist da equipe. */
+/** Tela para contas fora da allowlist. */
 function BlockedScreen({ email }: { email: string | null }) {
   const logout = useAuthStore((s) => s.logout)
   return (
@@ -16,14 +16,10 @@ function BlockedScreen({ email }: { email: string | null }) {
         <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-500 flex items-center justify-center mx-auto mb-4">
           <Lock className="w-7 h-7" />
         </div>
-        <h1 className="text-lg font-bold text-gray-900 mb-2">Acesso restrito à equipe</h1>
+        <h1 className="text-lg font-bold text-gray-900 mb-2">Acesso restrito</h1>
         <p className="text-sm text-gray-500 mb-4">
           Este aplicativo é de uso interno do ateliê. A conta{' '}
           <strong>{email ?? 'desconhecida'}</strong> não está na lista de e-mails autorizados.
-        </p>
-        <p className="text-sm text-gray-500 mb-6">
-          Se você deveria ter acesso, peça para a proprietária do ateliê confirmar o e-mail da sua
-          conta Google.
         </p>
         <Button variant="secondary" onClick={() => void logout()}>
           Sair e trocar de conta
@@ -41,17 +37,10 @@ function FullScreenLoading() {
   )
 }
 
-/** Tela de erro ao carregar dados do workspace (ex.: regras do Firestore não publicadas). */
+/** Tela de erro ao carregar dados do workspace. */
 function WorkspaceErrorScreen({ message }: { message: string }) {
-  const { user } = useAuthStore()
-  const { loadForUser, reset } = useWorkspaceStore()
+  const load = useWorkspaceStore((s) => s.load)
   const logout = useAuthStore((s) => s.logout)
-
-  const retry = () => {
-    if (!user) return
-    reset()
-    void loadForUser(user.uid)
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-amber-50 p-6">
@@ -59,9 +48,7 @@ function WorkspaceErrorScreen({ message }: { message: string }) {
         <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-4">
           <TriangleAlert className="w-7 h-7" />
         </div>
-        <h1 className="text-lg font-bold text-gray-900 mb-2">
-          Não foi possível carregar seu ateliê
-        </h1>
+        <h1 className="text-lg font-bold text-gray-900 mb-2">Não foi possível carregar o ateliê</h1>
         <p className="text-sm text-gray-500 mb-4">
           O app não conseguiu acessar o banco de dados. Verifique se o Firestore foi criado
           no console do Firebase e se as regras do arquivo <code>firestore.rules</code> foram
@@ -71,7 +58,7 @@ function WorkspaceErrorScreen({ message }: { message: string }) {
           {message}
         </p>
         <div className="flex flex-col gap-2">
-          <Button onClick={retry}>Tentar novamente</Button>
+          <Button onClick={() => void load()}>Tentar novamente</Button>
           <Button variant="ghost" onClick={() => void logout()}>
             Sair da conta
           </Button>
@@ -93,16 +80,14 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 /**
- * Exige workspace ativo; usuário logado sem workspace → /onboarding/workspace.
+ * Exige workspace carregado.
  * Deve ser usado DENTRO de RequireAuth.
  */
 export function RequireWorkspace({ children }: { children: ReactNode }) {
-  const { user } = useAuthStore()
   const { activeWorkspace, loading, error } = useWorkspaceStore()
 
-  if (!user) return <Navigate to="/login" replace />
   if (loading) return <FullScreenLoading />
   if (error) return <WorkspaceErrorScreen message={error} />
-  if (!activeWorkspace) return <Navigate to="/onboarding/workspace" replace />
+  if (!activeWorkspace) return <WorkspaceErrorScreen message="Workspace não encontrado." />
   return <>{children}</>
 }

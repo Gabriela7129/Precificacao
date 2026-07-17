@@ -4,12 +4,10 @@ import { Toaster } from 'sonner'
 import { AppShell } from './components/layout/AppShell'
 import { RequireAuth, RequireWorkspace } from './router/guards'
 import { LoginPage } from './features/auth/LoginPage'
-import { OnboardingWorkspacePage, OnboardingConvitesPage } from './features/onboarding'
 import { ConfiguracoesPage } from './features/configuracoes'
 import { MateriaisLevesPage, AtivosPesadosPage } from './features/materiais-ativos'
 import { InsumosPage } from './features/insumos'
 import { ComponentesPage, ComponenteNovoPage, ComponenteDetalhePage } from './features/componentes'
-import { MembrosPage } from './features/membros'
 import {
   ProdutosPage,
   ProdutoNovoPage,
@@ -30,17 +28,17 @@ function RootRedirect() {
 export default function App() {
   const init = useAuthStore((s) => s.init)
   const user = useAuthStore((s) => s.user)
-  const loadWorkspaces = useWorkspaceStore((s) => s.loadForUser)
-  const resetWorkspaces = useWorkspaceStore((s) => s.reset)
+  const loadWorkspace = useWorkspaceStore((s) => s.load)
+  const resetWorkspace = useWorkspaceStore((s) => s.reset)
 
   // Listener de auth (uma vez).
   useEffect(() => init(), [init])
 
-  // Carrega workspaces quando o usuário muda.
+  // Carrega o workspace único quando o usuário loga.
   useEffect(() => {
-    if (user) void loadWorkspaces(user.uid)
-    else resetWorkspaces()
-  }, [user, loadWorkspaces, resetWorkspaces])
+    if (user) void loadWorkspace()
+    else resetWorkspace()
+  }, [user, loadWorkspace, resetWorkspace])
 
   return (
     <BrowserRouter>
@@ -54,24 +52,6 @@ export default function App() {
       <Routes>
         {/* Pública */}
         <Route path="/login" element={<LoginPage />} />
-
-        {/* Auth (logado, sem exigir workspace) */}
-        <Route
-          path="/onboarding/workspace"
-          element={
-            <RequireAuth>
-              <OnboardingWorkspacePage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/onboarding/convites"
-          element={
-            <RequireAuth>
-              <OnboardingConvitesPage />
-            </RequireAuth>
-          }
-        />
 
         {/* App (logado + workspace) */}
         <Route
@@ -95,7 +75,6 @@ export default function App() {
           <Route path="/produtos/novo" element={<ProdutoNovoPage />} />
           <Route path="/produtos/:id" element={<ProdutoDetalhePage />} />
           <Route path="/produtos/:id/editar" element={<ProdutoEditarPage />} />
-          <Route path="/membros" element={<MembrosPage />} />
         </Route>
 
         {/* Fallback */}

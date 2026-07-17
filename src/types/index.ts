@@ -23,26 +23,11 @@ export interface AppUser {
 }
 
 // ---------------------------------------------------------------------------
-// workspaces (+ subcoleção members)
+// workspaces (workspace único compartilhado por todos os usuários autorizados)
 // ---------------------------------------------------------------------------
-export type WorkspaceRole = 'owner' | 'admin' | 'editor' | 'viewer'
-
 export interface Workspace {
   name: string
-  ownerId: string
-  /**
-   * Espelho dos userIds da subcoleção `members`. Mantido no documento do
-   * workspace para permitir queries (`array-contains`) e regras de segurança.
-   */
-  memberIds: string[]
   createdAt: unknown // serverTimestamp
-}
-
-/** Subcoleção `workspaces/{id}/members`. */
-export interface WorkspaceMember {
-  userId: string
-  role: WorkspaceRole
-  joinedAt: unknown // serverTimestamp
 }
 
 // ---------------------------------------------------------------------------

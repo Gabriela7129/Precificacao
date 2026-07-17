@@ -1,4 +1,4 @@
-import { Package, Scissors, Settings, Tag, Users, Wrench, Zap, type LucideIcon } from 'lucide-react'
+import { Package, Scissors, Settings, Tag, Wrench, Zap, type LucideIcon } from 'lucide-react'
 
 export interface NavItemDef {
   label: string
@@ -8,7 +8,7 @@ export interface NavItemDef {
   matchPrefix: string
 }
 
-/** Ordem fixa dos itens de navegação (design.md §4 + Equipe). */
+/** Ordem fixa dos itens de navegação (sem gestão de equipe). */
 export const NAV_ITEMS: NavItemDef[] = [
   { label: 'Configurações', to: '/configuracoes', icon: Settings, matchPrefix: '/configuracoes' },
   { label: 'Materiais Leves', to: '/materiais-leves', icon: Scissors, matchPrefix: '/materiais-leves' },
@@ -16,5 +16,4 @@ export const NAV_ITEMS: NavItemDef[] = [
   { label: 'Insumos', to: '/insumos', icon: Package, matchPrefix: '/insumos' },
   { label: 'Componentes', to: '/componentes', icon: Wrench, matchPrefix: '/componentes' },
   { label: 'Produtos', to: '/produtos', icon: Tag, matchPrefix: '/produtos' },
-  { label: 'Equipe', to: '/membros', icon: Users, matchPrefix: '/membros' },
 ]

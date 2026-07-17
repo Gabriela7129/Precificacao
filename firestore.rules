@@ -8,7 +8,6 @@ service cloud.firestore {
     }
 
     // ALLOWLIST: somente estes 4 e-mails podem usar o app.
-    // Qualquer outra conta Google é bloqueada em TUDO (leitura e escrita).
     function isAllowedUser() {
       return isSignedIn()
         && request.auth.token.email.lower() in [
@@ -19,18 +18,11 @@ service cloud.firestore {
         ];
     }
 
-    // Um usuário é membro de um workspace se seu uid está no array memberIds
-    // do documento do workspace (espelho da subcoleção members, usado para
-    // queries e regras).
-    function isMember(workspaceId) {
+    // Verifica se um documento pertence ao workspace único.
+    function belongsToWorkspace(data) {
       return isAllowedUser()
-        && exists(/databases/$(database)/documents/workspaces/$(workspaceId))
-        && request.auth.uid in get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.memberIds;
-    }
-
-    // Verifica membership a partir do campo workspaceId de um documento.
-    function isWorkspaceDoc(data) {
-      return isAllowedUser() && 'workspaceId' in data && isMember(data.workspaceId);
+        && 'workspaceId' in data
+        && data.workspaceId == 'th1su6PkVx9Gjwkdocqr';
     }
 
     match /users/{uid} {
@@ -40,59 +32,23 @@ service cloud.firestore {
     }
 
     match /workspaces/{workspaceId} {
-      // GET (documento único): pode usar get()/exists() normalmente.
-      allow get: if isMember(workspaceId);
-      // LIST (consultas): regras NÃO são filtros — a consulta precisa ser
-      // provavelmente segura apenas com os dados do próprio documento.
-      // Por isso usamos resource.data.memberIds aqui (a query do app já
-      // filtra com array-contains no mesmo campo).
-      allow list: if isAllowedUser() && request.auth.uid in resource.data.memberIds;
-      allow create: if isAllowedUser()
-        && request.resource.data.ownerId == request.auth.uid
-        && request.auth.uid in request.resource.data.memberIds;
-      // UPDATE: membros podem tudo; um convidado pode APENAS se adicionar a
-      // memberIds (auto-join), e somente se existir convite pendente para o
-      // e-mail da conta Google dele (doc `members/invite_<email>`).
-      allow update: if isMember(workspaceId)
-        || (isAllowedUser()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
-          && request.auth.uid in request.resource.data.memberIds
-          && !(request.auth.uid in resource.data.memberIds)
-          && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$('invite_' + request.auth.token.email.lower())));
-      allow delete: if isMember(workspaceId);
-
-      match /members/{memberId} {
-        // GET: membros do workspace, ou o próprio usuário lendo seu registro.
-        allow get: if isMember(workspaceId)
-          || (isAllowedUser() && resource.data.userId == request.auth.uid);
-        // LIST: regras separadas — cada uma precisa ser provável sozinha.
-        // (a) Membros do workspace listam todos os membros/convites.
-        allow list: if isMember(workspaceId);
-        // (b) Descoberta de convites pelo próprio e-mail (collectionGroup
-        // "tenho convites?") — a query filtra email == e-mail do token.
-        allow list: if isAllowedUser() && resource.data.email == request.auth.token.email.lower();
-        allow create: if isAllowedUser()
-          && (isMember(workspaceId) || request.resource.data.userId == request.auth.uid);
-        allow update: if isMember(workspaceId);
-        // DELETE: membros do workspace; ou o convidado removendo o próprio
-        // convite (usado ao aceitar o convite).
-        allow delete: if isMember(workspaceId)
-          || (isAllowedUser() && resource.data.email == request.auth.token.email.lower());
-      }
+      allow get: if isAllowedUser() && workspaceId == 'th1su6PkVx9Gjwkdocqr';
+      allow list: if isAllowedUser();
+      allow create, update, delete: if false;
     }
 
-    // Todas as coleções de dados são escopadas por workspaceId.
+    // Todas as coleções de dados são escopadas ao workspace único.
     match /{collectionName}/{docId} {
       allow read, update, delete: if collectionName in [
           'settings', 'lightTools', 'heavyAssets', 'supplyCategories',
           'supplies', 'supplyEntries', 'marketplaces',
           'semiFinishedComponents', 'products'
-        ] && isWorkspaceDoc(resource.data);
+        ] && belongsToWorkspace(resource.data);
       allow create: if collectionName in [
           'settings', 'lightTools', 'heavyAssets', 'supplyCategories',
           'supplies', 'supplyEntries', 'marketplaces',
           'semiFinishedComponents', 'products'
-        ] && isWorkspaceDoc(request.resource.data);
+        ] && belongsToWorkspace(request.resource.data);
     }
   }
 }

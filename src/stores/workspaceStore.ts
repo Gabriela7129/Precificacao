@@ -1,62 +1,54 @@
 import { create } from 'zustand'
-import { collection, getDocs, query, where } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import type { WithId, Workspace } from '../types'
 
-const STORAGE_KEY = 'precificador.activeWorkspaceId'
+/** ID fixo do workspace único compartilhado por todos os usuários autorizados. */
+export const FIXED_WORKSPACE_ID = 'th1su6PkVx9Gjwkdocqr'
 
 interface WorkspaceState {
-  /** Workspaces dos quais o usuário logado é membro. */
-  workspaces: WithId<Workspace>[]
-  /** Workspace ativo no momento (persistido em localStorage). */
+  /** Workspace único do app. */
   activeWorkspace: WithId<Workspace> | null
-  /** true enquanto carrega os workspaces do usuário. */
+  /** true enquanto carrega o workspace. */
   loading: boolean
   /** Mensagem de erro da última carga (ex.: permissão negada no Firestore). */
   error: string | null
-  /** Carrega os workspaces do usuário e define o ativo. */
-  loadForUser: (uid: string) => Promise<void>
-  setActiveWorkspace: (workspaceId: string) => void
+  /** Carrega o workspace único. */
+  load: () => Promise<void>
   /** Chamado no logout. */
   reset: () => void
 }
 
-export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
-  workspaces: [],
+export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   activeWorkspace: null,
   loading: true,
   error: null,
 
-  loadForUser: async (uid) => {
+  load: async () => {
     set({ loading: true, error: null })
     try {
-      const q = query(collection(db, 'workspaces'), where('memberIds', 'array-contains', uid))
-      const snap = await getDocs(q)
-      const workspaces = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Workspace) }))
+      const ref = doc(db, 'workspaces', FIXED_WORKSPACE_ID)
+      const snap = await getDoc(ref)
 
-      const savedId = localStorage.getItem(STORAGE_KEY)
-      const active =
-        workspaces.find((w) => w.id === savedId) ?? workspaces[0] ?? null
+      if (!snap.exists()) {
+        set({ activeWorkspace: null, loading: false, error: 'Workspace não encontrado.' })
+        return
+      }
 
-      set({ workspaces, activeWorkspace: active, loading: false })
+      const workspace: WithId<Workspace> = {
+        id: snap.id,
+        ...(snap.data() as Workspace),
+      }
+      set({ activeWorkspace: workspace, loading: false, error: null })
     } catch (err) {
-      console.error('[workspace] Falha ao carregar workspaces:', err)
+      console.error('[workspace] Falha ao carregar workspace:', err)
       const message =
         err instanceof Error ? err.message : 'Erro desconhecido ao acessar o banco de dados.'
-      set({ workspaces: [], activeWorkspace: null, loading: false, error: message })
-    }
-  },
-
-  setActiveWorkspace: (workspaceId) => {
-    const active = get().workspaces.find((w) => w.id === workspaceId) ?? null
-    if (active) {
-      localStorage.setItem(STORAGE_KEY, active.id)
-      set({ activeWorkspace: active })
+      set({ activeWorkspace: null, loading: false, error: message })
     }
   },
 
   reset: () => {
-    localStorage.removeItem(STORAGE_KEY)
-    set({ workspaces: [], activeWorkspace: null, loading: true, error: null })
+    set({ activeWorkspace: null, loading: true, error: null })
   },
 }))
