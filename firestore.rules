@@ -14,8 +14,8 @@ service cloud.firestore {
         && request.auth.token.email.lower() in [
           'laetiessentia@gmail.com',
           'gabriela2004t@gmail.com',
-          'lettprincesa@gmail.com',
-          'ltomio@hotmail.com'
+          'iamleticiamartins67@gmail.com',
+          'ltomio@gmail.com'
         ];
     }
 
@@ -65,11 +65,12 @@ service cloud.firestore {
         // GET: membros do workspace, ou o próprio usuário lendo seu registro.
         allow get: if isMember(workspaceId)
           || (isAllowedUser() && resource.data.userId == request.auth.uid);
-        // LIST: membros do workspace listam tudo; usuário da allowlist pode
-        // descobrir convites pendentes endereçados ao próprio e-mail
-        // (usado pela query collectionGroup "tenho convites?").
-        allow list: if isMember(workspaceId)
-          || (isAllowedUser() && resource.data.email == request.auth.token.email.lower());
+        // LIST: regras separadas — cada uma precisa ser provável sozinha.
+        // (a) Membros do workspace listam todos os membros/convites.
+        allow list: if isMember(workspaceId);
+        // (b) Descoberta de convites pelo próprio e-mail (collectionGroup
+        // "tenho convites?") — a query filtra email == e-mail do token.
+        allow list: if isAllowedUser() && resource.data.email == request.auth.token.email.lower();
         allow create: if isAllowedUser()
           && (isMember(workspaceId) || request.resource.data.userId == request.auth.uid);
         allow update: if isMember(workspaceId);

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from 'react-router-dom'
@@ -67,6 +67,34 @@ export function OnboardingWorkspacePage() {
   }
 
   const hasInvites = invites.length > 0
+
+  // Aceite automático: usuário convidado cai direto no workspace, sem clique.
+  // Executa uma única vez (guard via ref); se falhar, o card manual aparece.
+  const autoAcceptTried = useRef(false)
+  useEffect(() => {
+    if (autoAcceptTried.current) return
+    if (!user || invites.length === 0) return
+    autoAcceptTried.current = true
+    void handleAccept(invites[0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, invites])
+
+  // Enquanto o aceite automático está em andamento, mostra tela de entrada.
+  if (hasInvites && acceptingId !== null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-amber-50">
+        <div className="w-full max-w-md bg-white rounded-3xl border border-rose-200 shadow-lg p-8 text-center">
+          <div className="flex justify-center mb-6">
+            <Logo size="lg" />
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">
+            Entrando em {invites[0]?.workspaceName ?? 'seu workspace'}...
+          </h1>
+          <p className="text-sm text-gray-500">Preparando tudo para você 🎀</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-amber-50">
