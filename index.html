@@ -4,7 +4,27 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Precificador — Cálculo de custos para artesanato</title>
+    <script>
+      // Força remoção de service workers e caches antigos no primeiro carregamento.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (registrations) {
+          registrations.forEach(function (registration) {
+            registration.unregister()
+          })
+        })
+        if ('caches' in window) {
+          caches.keys().then(function (names) {
+            names.forEach(function (name) {
+              caches.delete(name)
+            })
+          })
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
