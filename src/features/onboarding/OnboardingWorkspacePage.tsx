@@ -1,0 +1,82 @@
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
+import { Button } from '../../components/ui/Button'
+import { FieldError, FieldHint, FieldLabel, Input } from '../../components/ui/Input'
+import { Logo } from '../../components/ui/Logo'
+import { createWorkspace } from '../../services/workspaces'
+import { useAuthStore } from '../../stores/authStore'
+import { useWorkspaceStore } from '../../stores/workspaceStore'
+import { workspaceFormSchema, type WorkspaceFormValues } from './schemas'
+
+/**
+ * /onboarding/workspace — criação do workspace (nome do ateliê).
+ * Cria workspace + seeds (settings, categorias, marketplaces), define o
+ * workspace ativo no store e segue para o convite de membros.
+ */
+export function OnboardingWorkspacePage() {
+  const user = useAuthStore((s) => s.user)
+  const loadForUser = useWorkspaceStore((s) => s.loadForUser)
+  const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace)
+  const navigate = useNavigate()
+  const [submitting, setSubmitting] = useState(false)
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<WorkspaceFormValues>({
+    resolver: zodResolver(workspaceFormSchema),
+    mode: 'onBlur',
+    defaultValues: { name: '' },
+  })
+
+  const onSubmit = async (values: WorkspaceFormValues) => {
+    if (!user) return
+    setSubmitting(true)
+    try {
+      const workspaceId = await createWorkspace(values.name.trim(), user.uid)
+      await loadForUser(user.uid)
+      setActiveWorkspace(workspaceId)
+      toast.success('Workspace criado com sucesso')
+      navigate('/onboarding/convites', { replace: true })
+    } catch {
+      toast.error('Não foi possível salvar. Tente novamente.')
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6 bg-amber-50">
+      <div className="w-full max-w-md bg-white rounded-3xl border border-rose-200 shadow-lg p-8">
+        <div className="flex justify-center mb-6">
+          <Logo size="lg" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 text-center">Criar workspace</h1>
+        <p className="text-sm text-gray-500 text-center mt-1 mb-8">Nome do ateliê ou empresa</p>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          <div>
+            <FieldLabel htmlFor="workspace-name">Nome do workspace</FieldLabel>
+            <Input
+              id="workspace-name"
+              placeholder="Ex.: Ateliê da Gabi"
+              autoFocus
+              error={!!errors.name}
+              {...register('name')}
+            />
+            {errors.name ? (
+              <FieldError>{errors.name.message}</FieldError>
+            ) : (
+              <FieldHint>Você poderá convidar outras pessoas na próxima etapa.</FieldHint>
+            )}
+          </div>
+          <Button type="submit" className="w-full" loading={submitting}>
+            Continuar
+          </Button>
+        </form>
+      </div>
+    </div>
+  )
+}
