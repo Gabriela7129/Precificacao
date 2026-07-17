@@ -9,6 +9,7 @@ import { ConfiguracoesPage } from './features/configuracoes'
 import { MateriaisLevesPage, AtivosPesadosPage } from './features/materiais-ativos'
 import { InsumosPage } from './features/insumos'
 import { ComponentesPage, ComponenteNovoPage, ComponenteDetalhePage } from './features/componentes'
+import { MembrosPage } from './features/membros'
 import {
   ProdutosPage,
   ProdutoNovoPage,
@@ -94,6 +95,7 @@ export default function App() {
           <Route path="/produtos/novo" element={<ProdutoNovoPage />} />
           <Route path="/produtos/:id" element={<ProdutoDetalhePage />} />
           <Route path="/produtos/:id/editar" element={<ProdutoEditarPage />} />
+          <Route path="/membros" element={<MembrosPage />} />
         </Route>
 
         {/* Fallback */}
