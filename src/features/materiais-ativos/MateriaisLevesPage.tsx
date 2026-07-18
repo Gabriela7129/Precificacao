@@ -21,12 +21,14 @@ import {
   THead,
   TR,
 } from '../../components/ui'
-import { DEFAULT_LIGHT_MAINTENANCE_RATE, lightMaintenancePerHour } from '../../lib/calculations'
+import { DEFAULT_LIGHT_MAINTENANCE_RATE, lightMaintenancePerHour, lightToolMonthlyMaintenance } from '../../lib/calculations'
 import { formatBRL, formatDate } from '../../lib/format'
-import { deleteLightTool, useActiveWorkspaceId, useLightTools } from '../../services/firestore'
+import { deleteLightTool, useActiveWorkspaceId, useLightTools, createLightTool } from '../../services/firestore'
 import type { LightTool, WithId } from '../../types'
 import { useWorkspaceSettings } from './data'
 import { MaterialLeveFormModal } from './MaterialLeveFormModal'
+import { ImportExportButtons } from '../../components/ui'
+import { downloadExcel, parseCurrency, parseDate, parseExcelFile } from '../../lib/excel'
 
 export function MateriaisLevesPage() {
   const { data: tools, loading: toolsLoading } = useLightTools()
@@ -82,15 +84,71 @@ export function MateriaisLevesPage() {
     }
   }
 
+  const handleExport = () => {
+    const rows = tools.map((t) => ({
+      Nome: t.name,
+      'Valor pago': t.purchaseValue,
+      'Data da compra': formatDate(t.purchaseDate),
+    }))
+    downloadExcel(
+      'materiais-leves.xlsx',
+      'Materiais Leves',
+      rows,
+      [
+        { header: 'Nome', key: 'Nome', width: 35 },
+        { header: 'Valor pago', key: 'Valor pago', width: 20 },
+        { header: 'Data da compra', key: 'Data da compra', width: 20 },
+      ],
+    )
+  }
+
+  const handleImport = async (file: File) => {
+    if (!wsId) return
+    interface LightToolImportRow {
+      Nome: string
+      'Valor pago': number
+      'Data da compra': string
+    }
+    const rows = await parseExcelFile<LightToolImportRow>(file, [
+      { header: 'Nome', key: 'Nome' },
+      { header: 'Valor pago', key: 'Valor pago', parse: parseCurrency },
+      { header: 'Data da compra', key: 'Data da compra', parse: parseDate },
+    ])
+
+    let created = 0
+    for (const row of rows) {
+      const name = String(row.Nome ?? '').trim()
+      const purchaseValue = Number(row['Valor pago']) || 0
+      const purchaseDate = row['Data da compra'] || ''
+      if (!name || purchaseValue <= 0 || !purchaseDate) continue
+      await createLightTool(wsId, {
+        name,
+        purchaseValue,
+        purchaseDate,
+        monthlyMaintenanceCost: lightToolMonthlyMaintenance(purchaseValue, maintenanceRate),
+        isActive: true,
+      })
+      created++
+    }
+    toast.success(`${created} material(is) importado(s)`)
+  }
+
   return (
     <div>
       <PageHeader
         title="Materiais Leves"
         actions={
-          <Button onClick={openCreate}>
-            <Plus className="w-4 h-4" />
-            Novo material
-          </Button>
+          <div className="flex items-center gap-2">
+            <ImportExportButtons
+              entityLabel="materiais leves"
+              onExport={handleExport}
+              onImport={handleImport}
+            />
+            <Button onClick={openCreate}>
+              <Plus className="w-4 h-4" />
+              Novo material
+            </Button>
+          </div>
         }
       />
 

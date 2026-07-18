@@ -27,6 +27,8 @@ import {
 } from '../../components/ui'
 import { formatBRL, formatDate, formatNumber } from '../../lib/format'
 import {
+  createSupply,
+  createSupplyCategory,
   deleteSupply,
   useActiveWorkspaceId,
   useSupplies,
@@ -37,6 +39,8 @@ import type { Supply, WithId } from '../../types'
 import { CategoriasModal } from './CategoriasModal'
 import { EntradaEstoqueModal } from './EntradaEstoqueModal'
 import { InsumoFormModal } from './InsumoFormModal'
+import { downloadExcel, parseCurrency, parseExcelFile, parseNumber } from '../../lib/excel'
+import { ImportExportButtons } from '../../components/ui'
 
 /** Alterna a cor do Badge por hash da categoria (amber/rose, ver design.md). */
 function categoryBadgeVariant(categoryId: string): 'amber' | 'rose' {
@@ -127,6 +131,97 @@ export function InsumosPage() {
     }
   }
 
+  const handleExport = () => {
+    const rows = supplies.map((s) => {
+      const category = categoryById.get(s.categoryId)
+      return {
+        Nome: s.name,
+        Unidade: s.unit,
+        Categoria: category?.name ?? '',
+        Estoque: s.currentStock,
+        'Valor total em estoque': s.totalStockValue,
+      }
+    })
+    downloadExcel(
+      'insumos.xlsx',
+      'Insumos',
+      rows,
+      [
+        { header: 'Nome', key: 'Nome', width: 35 },
+        { header: 'Unidade', key: 'Unidade', width: 15 },
+        { header: 'Categoria', key: 'Categoria', width: 25 },
+        { header: 'Estoque', key: 'Estoque', width: 15 },
+        { header: 'Valor total em estoque', key: 'Valor total em estoque', width: 25 },
+      ],
+    )
+  }
+
+  const handleImport = async (file: File) => {
+    if (!wsId) return
+    interface SupplyImportRow {
+      Nome: string
+      Unidade: string
+      Categoria: string
+      Estoque: number
+      'Valor total em estoque': number
+    }
+    const rows = await parseExcelFile<SupplyImportRow>(file, [
+      { header: 'Nome', key: 'Nome' },
+      { header: 'Unidade', key: 'Unidade' },
+      { header: 'Categoria', key: 'Categoria' },
+      { header: 'Estoque', key: 'Estoque', parse: parseNumber },
+      { header: 'Valor total em estoque', key: 'Valor total em estoque', parse: parseCurrency },
+    ])
+
+    const nameMap = new Map(categories.map((c) => [c.name.trim().toLowerCase(), c.id]))
+    let created = 0
+    for (const row of rows) {
+      const name = String(row.Nome ?? '').trim()
+      const unit = String(row.Unidade ?? '').trim()
+      const categoryName = String(row.Categoria ?? '').trim()
+      const stock = Number(row.Estoque) || 0
+      const totalValue = Number(row['Valor total em estoque']) || 0
+      if (!name || !unit || stock <= 0) continue
+
+      let categoryId = nameMap.get(categoryName.toLowerCase())
+      if (!categoryId && categoryName) {
+        const newCategory = await createSupplyCategory(wsId, {
+          name: categoryName,
+          isDefault: false,
+          order: categories.length,
+        })
+        categoryId = newCategory
+        nameMap.set(categoryName.toLowerCase(), newCategory)
+      }
+      if (!categoryId) {
+        // Categoria padrão: usa a primeira existente ou cria "Sem categoria".
+        if (categories.length > 0) {
+          categoryId = categories[0].id
+        } else {
+          const fallback = await createSupplyCategory(wsId, {
+            name: 'Sem categoria',
+            isDefault: true,
+            order: 0,
+          })
+          categoryId = fallback
+          nameMap.set('sem categoria', fallback)
+          categories.push({ id: fallback, name: 'Sem categoria', isDefault: true, order: 0, workspaceId: wsId })
+        }
+      }
+      await createSupply(wsId, {
+        name,
+        unit,
+        categoryId,
+        currentStock: stock,
+        averageCost: stock > 0 ? totalValue / stock : 0,
+        totalStockValue: totalValue,
+        isActive: true,
+      })
+      created++
+    }
+    toast.success(`${created} insumo(s) importado(s)`)
+  }
+
   if (loadingSupplies) {
     return (
       <div>
@@ -142,6 +237,11 @@ export function InsumosPage() {
         title="Insumos"
         actions={
           <>
+            <ImportExportButtons
+              entityLabel="insumos"
+              onExport={handleExport}
+              onImport={handleImport}
+            />
             <Button variant="secondary" onClick={() => openEntry(null)}>
               + Entrada
             </Button>
