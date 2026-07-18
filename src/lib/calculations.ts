@@ -142,9 +142,11 @@ export function weightedAverageCost(
 export interface ComponentCostInput {
   /** Linhas de insumo com custo unitário atual (será salvo como snapshot). */
   supplies: ComponentSupplyLine[]
-  machineTimeHours: number
-  /** Custo/hora do ativo pesado selecionado (0 ou omitido se "Nenhum"). */
-  machineCostPerHour?: number
+  /** Linhas de máquina pesada com tempo em horas. */
+  machineAssets: { assetId: string; timeHours: number; costPerHour: number }[]
+  /** Linhas de materiais leves com tempo em horas. */
+  lightTools: { toolId: string; timeHours: number; costPerHour: number }[]
+  /** Tempo de mão de obra em horas. */
   humanTimeHours: number
   /** Valor hora do perfil selecionado (operacional ou criativo). */
   humanHourlyRate: number
@@ -152,7 +154,8 @@ export interface ComponentCostInput {
 
 /**
  * custo unitário = Σ(insumo × quantidade × custo médio)
- *                + (tempo máquina × custo/hora do ativo)
+ *                + Σ(tempo máquina × custo/hora do ativo)
+ *                + Σ(tempo material leve × rateio/hora)
  *                + (tempo humano × valor hora)
  */
 export function componentUnitCost(input: ComponentCostInput): number {
@@ -160,9 +163,16 @@ export function componentUnitCost(input: ComponentCostInput): number {
     (sum, line) => sum + line.quantity * line.unitCostSnapshot,
     0,
   )
-  const machineCost = input.machineTimeHours * (input.machineCostPerHour ?? 0)
+  const machineCost = input.machineAssets.reduce(
+    (sum, line) => sum + line.timeHours * line.costPerHour,
+    0,
+  )
+  const lightToolCost = input.lightTools.reduce(
+    (sum, line) => sum + line.timeHours * line.costPerHour,
+    0,
+  )
   const humanCost = input.humanTimeHours * input.humanHourlyRate
-  return suppliesCost + machineCost + humanCost
+  return suppliesCost + machineCost + lightToolCost + humanCost
 }
 
 // ---------------------------------------------------------------------------

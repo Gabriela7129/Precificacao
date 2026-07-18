@@ -11,7 +11,7 @@
  *   com os custos recalculados — ver `data.ts`.
  */
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -28,7 +28,7 @@ import {
   FieldLabel,
   Input,
   SegmentedControl,
-  Select,
+  SelectSearchable,
 } from '../../components/ui'
 import { formatBRL } from '../../lib/format'
 import {
@@ -50,13 +50,25 @@ const supplyLineSchema = z.object({
     .positive('Informe um valor maior que zero'),
 })
 
+const machineLineSchema = z.object({
+  assetId: z.string().min(1, 'Selecione um ativo'),
+  timeMinutes: z.coerce
+    .number({ invalid_type_error: 'Obrigatório' })
+    .min(0, 'Não pode ser negativo'),
+})
+
+const lightToolLineSchema = z.object({
+  toolId: z.string().min(1, 'Selecione um material leve'),
+  timeMinutes: z.coerce
+    .number({ invalid_type_error: 'Obrigatório' })
+    .min(0, 'Não pode ser negativo'),
+})
+
 const componentFormSchema = z.object({
   name: z.string().min(2, 'Informe um nome com pelo menos 2 caracteres'),
   supplies: z.array(supplyLineSchema),
-  machineAssetId: z.string(), // '' = Nenhum
-  machineTimeMinutes: z.coerce
-    .number({ invalid_type_error: 'Obrigatório' })
-    .min(0, 'Não pode ser negativo'),
+  machineAssets: z.array(machineLineSchema),
+  lightTools: z.array(lightToolLineSchema),
   humanProfile: z.enum(['operational', 'creative']),
   humanTimeMinutes: z.coerce
     .number({ invalid_type_error: 'Obrigatório' })
@@ -79,7 +91,7 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
 
   const navigate = useNavigate()
   const wsId = useActiveWorkspaceId()
-  const { supplies, heavyAssets, settings } = useComposicaoData()
+  const { supplies, heavyAssets, lightTools, settings } = useComposicaoData()
 
   const [confirmReavaliar, setConfirmReavaliar] = useState(false)
   const [reavaliando, setReavaliando] = useState(false)
@@ -100,43 +112,54 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
             supplyId: l.supplyId,
             quantity: l.quantity,
           })),
-          machineAssetId: componente.machineAssetId ?? '',
-          machineTimeMinutes: Math.round(componente.machineTimeHours * 60),
+          machineAssets: componente.machineAssets.map((l) => ({
+            assetId: l.assetId,
+            timeMinutes: l.timeMinutes,
+          })),
+          lightTools: componente.lightTools.map((l) => ({
+            toolId: l.toolId,
+            timeMinutes: l.timeMinutes,
+          })),
           humanProfile: componente.humanProfile,
           humanTimeMinutes: Math.round(componente.humanTimeHours * 60),
         }
       : {
           name: '',
           supplies: [],
-          machineAssetId: '',
-          machineTimeMinutes: 0,
+          machineAssets: [],
+          lightTools: [],
           humanProfile: 'operational',
           humanTimeMinutes: 0,
         },
   })
 
-  const { fields, append, remove } = useFieldArray({ control, name: 'supplies' })
+  const { fields: supplyFields, append: appendSupply, remove: removeSupply } = useFieldArray({ control, name: 'supplies' })
+  const { fields: machineFields, append: appendMachine, remove: removeMachine } = useFieldArray({ control, name: 'machineAssets' })
+  const { fields: lightToolFields, append: appendLightTool, remove: removeLightTool } = useFieldArray({ control, name: 'lightTools' })
   const values = watch()
 
   // Recálculo ao vivo do painel de custo (sempre com os custos atuais).
-  const custo = useMemo(
-    () =>
-      calcularCustoComposicao(
-        {
-          supplies: (values.supplies ?? []).map((l) => ({
-            supplyId: l?.supplyId ?? '',
-            quantity: Number(l?.quantity) || 0,
-          })),
-          machineAssetId: values.machineAssetId || null,
-          machineTimeMinutes: Number(values.machineTimeMinutes) || 0,
-          humanProfile: values.humanProfile ?? 'operational',
-          humanTimeMinutes: Number(values.humanTimeMinutes) || 0,
-        },
-        supplies,
-        heavyAssets,
-        settings,
-      ),
-    [values, supplies, heavyAssets, settings],
+  const custo = calcularCustoComposicao(
+    {
+      supplies: (values.supplies ?? []).map((l) => ({
+        supplyId: l?.supplyId ?? '',
+        quantity: Number(l?.quantity) || 0,
+      })),
+      machineAssets: (values.machineAssets ?? []).map((l) => ({
+        assetId: l?.assetId ?? '',
+        timeMinutes: Number(l?.timeMinutes) || 0,
+      })),
+      lightTools: (values.lightTools ?? []).map((l) => ({
+        toolId: l?.toolId ?? '',
+        timeMinutes: Number(l?.timeMinutes) || 0,
+      })),
+      humanProfile: values.humanProfile ?? 'operational',
+      humanTimeMinutes: Number(values.humanTimeMinutes) || 0,
+    },
+    supplies,
+    heavyAssets,
+    lightTools,
+    settings,
   )
 
   const humanHourlyRate =
@@ -150,8 +173,8 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
       const payload = {
         name: formValues.name.trim(),
         supplies: custo.lines,
-        machineTimeHours: custo.machineTimeHours,
-        machineAssetId: formValues.machineAssetId || null,
+        machineAssets: custo.machineLines,
+        lightTools: custo.lightToolLines,
         humanTimeHours: custo.humanTimeHours,
         humanProfile: formValues.humanProfile,
         unitCost: custo.unitCost,
@@ -172,7 +195,7 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
     if (!wsId || !componente) return
     setReavaliando(true)
     try {
-      const novoId = await reavaliarComponente(wsId, componente, supplies, heavyAssets, settings)
+      const novoId = await reavaliarComponente(wsId, componente, supplies, heavyAssets, lightTools, settings)
       toast.success(`Nova versão criada (v${componente.version + 1})`)
       setConfirmReavaliar(false)
       navigate(`/componentes/${novoId}`)
@@ -232,42 +255,51 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
             <Card>
               <h2 className="font-semibold text-gray-900 mb-4">Insumos</h2>
               <div className="space-y-3">
-                {fields.map((field, index) => {
+                {supplyFields.map((field, index) => {
                   const line = values.supplies?.[index]
                   const supply = supplies.find((s) => s.id === line?.supplyId)
                   const subtotal = supply ? (Number(line?.quantity) || 0) * supply.averageCost : 0
                   return (
                     <div key={field.id}>
-                      <div className="flex gap-3 items-center">
-                        <div className="flex-1">
-                          <Select
-                            error={!!errors.supplies?.[index]?.supplyId}
-                            {...register(`supplies.${index}.supplyId`)}
-                          >
-                            <option value="">Selecione um insumo</option>
-                            {supplies.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name} ({formatBRL(s.averageCost)}/{s.unit})
-                              </option>
-                            ))}
-                          </Select>
+                      <div className="flex gap-3 items-start">
+                        <div className="flex-[3] min-w-0">
+                          <Controller
+                            control={control}
+                            name={`supplies.${index}.supplyId`}
+                            render={({ field: { onChange, value } }) => (
+                              <SelectSearchable
+                                options={supplies.map((s) => ({
+                                  value: s.id,
+                                  label: `${s.name} (${formatBRL(s.averageCost)}/${s.unit})`,
+                                }))}
+                                value={value}
+                                onChange={onChange}
+                                placeholder="Selecione um insumo"
+                              />
+                            )}
+                          />
                         </div>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="any"
-                          placeholder="Qtd."
-                          className="w-28"
-                          error={!!errors.supplies?.[index]?.quantity}
-                          {...register(`supplies.${index}.quantity`)}
-                        />
-                        <span className="text-sm text-gray-600 w-24 text-right">
+                        <div className="w-24 flex-shrink-0">
+                          <FieldLabel htmlFor={`supply-qty-${index}`} className="sr-only">
+                            Qtd.
+                          </FieldLabel>
+                          <Input
+                            id={`supply-qty-${index}`}
+                            type="number"
+                            min="0"
+                            step="any"
+                            placeholder="Qtd."
+                            error={!!errors.supplies?.[index]?.quantity}
+                            {...register(`supplies.${index}.quantity`)}
+                          />
+                        </div>
+                        <span className="text-sm text-gray-600 w-20 text-right pt-2">
                           {formatBRL(subtotal)}
                         </span>
                         <button
                           type="button"
-                          onClick={() => remove(index)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-rose-50 rounded-lg transition"
+                          onClick={() => removeSupply(index)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-rose-50 rounded-lg transition mt-0.5"
                           aria-label="Remover insumo"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -282,7 +314,7 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
                     </div>
                   )
                 })}
-                {fields.length === 0 && (
+                {supplyFields.length === 0 && (
                   <p className="text-sm text-gray-500">Nenhum insumo adicionado.</p>
                 )}
               </div>
@@ -290,7 +322,7 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
                 <Button
                   variant="ghost"
                   type="button"
-                  onClick={() => append({ supplyId: '', quantity: 1 })}
+                  onClick={() => appendSupply({ supplyId: '', quantity: 1 })}
                 >
                   + Adicionar insumo
                 </Button>
@@ -298,33 +330,156 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
             </Card>
 
             <Card>
-              <h2 className="font-semibold text-gray-900 mb-4">Tempo de máquina</h2>
-              <div className="space-y-4">
-                <div>
-                  <FieldLabel htmlFor="machineAssetId">Ativo pesado</FieldLabel>
-                  <Select id="machineAssetId" {...register('machineAssetId')}>
-                    <option value="">Nenhum</option>
-                    {heavyAssets.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} ({formatBRL(a.totalCostPerHour)}/hora)
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div>
-                  <FieldLabel htmlFor="machineTimeMinutes">Tempo (minutos)</FieldLabel>
-                  <Input
-                    id="machineTimeMinutes"
-                    type="number"
-                    min="0"
-                    step="1"
-                    error={!!errors.machineTimeMinutes}
-                    {...register('machineTimeMinutes')}
-                  />
-                  {errors.machineTimeMinutes && (
-                    <FieldError>{errors.machineTimeMinutes.message}</FieldError>
-                  )}
-                </div>
+              <h2 className="font-semibold text-gray-900 mb-4">Ativo pesado</h2>
+              <div className="space-y-3">
+                {machineFields.map((field, index) => {
+                  const line = values.machineAssets?.[index]
+                  const asset = heavyAssets.find((a) => a.id === line?.assetId)
+                  const subtotal = asset ? ((line?.timeMinutes || 0) / 60) * asset.totalCostPerHour : 0
+                  return (
+                    <div key={field.id}>
+                      <div className="flex gap-3 items-start">
+                        <div className="flex-[3] min-w-0">
+                          <Controller
+                            control={control}
+                            name={`machineAssets.${index}.assetId`}
+                            render={({ field: { onChange, value } }) => (
+                              <SelectSearchable
+                                options={heavyAssets.map((a) => ({
+                                  value: a.id,
+                                  label: `${a.name} (${formatBRL(a.totalCostPerHour)}/h)`,
+                                }))}
+                                value={value}
+                                onChange={onChange}
+                                placeholder="Selecione um ativo"
+                              />
+                            )}
+                          />
+                        </div>
+                        <div className="w-24 flex-shrink-0">
+                          <FieldLabel htmlFor={`machine-min-${index}`} className="sr-only">
+                            Min.
+                          </FieldLabel>
+                          <Input
+                            id={`machine-min-${index}`}
+                            type="number"
+                            min="0"
+                            step="1"
+                            placeholder="Min."
+                            error={!!errors.machineAssets?.[index]?.timeMinutes}
+                            {...register(`machineAssets.${index}.timeMinutes`)}
+                          />
+                        </div>
+                        <span className="text-sm text-gray-600 w-20 text-right pt-2">
+                          {formatBRL(subtotal)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeMachine(index)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-rose-50 rounded-lg transition mt-0.5"
+                          aria-label="Remover ativo"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      {(errors.machineAssets?.[index]?.assetId || errors.machineAssets?.[index]?.timeMinutes) && (
+                        <FieldError>
+                          {errors.machineAssets[index]?.assetId?.message ??
+                            errors.machineAssets[index]?.timeMinutes?.message}
+                        </FieldError>
+                      )}
+                    </div>
+                  )
+                })}
+                {machineFields.length === 0 && (
+                  <p className="text-sm text-gray-500">Nenhum ativo adicionado.</p>
+                )}
+              </div>
+              <div className="mt-4">
+                <Button
+                  variant="ghost"
+                  type="button"
+                  onClick={() => appendMachine({ assetId: '', timeMinutes: 0 })}
+                >
+                  + Adicionar ativo
+                </Button>
+              </div>
+            </Card>
+
+            <Card>
+              <h2 className="font-semibold text-gray-900 mb-4">Materiais leves</h2>
+              <div className="space-y-3">
+                {lightToolFields.map((field, index) => {
+                  const line = values.lightTools?.[index]
+                  const tool = lightTools.find((t) => t.id === line?.toolId)
+                  const subtotal = tool ? ((line?.timeMinutes || 0) / 60) * tool.monthlyMaintenanceCost : 0
+                  return (
+                    <div key={field.id}>
+                      <div className="flex gap-3 items-start">
+                        <div className="flex-[3] min-w-0">
+                          <Controller
+                            control={control}
+                            name={`lightTools.${index}.toolId`}
+                            render={({ field: { onChange, value } }) => (
+                              <SelectSearchable
+                                options={lightTools.map((t) => ({
+                                  value: t.id,
+                                  label: `${t.name} (${formatBRL(t.monthlyMaintenanceCost)}/h)`,
+                                }))}
+                                value={value}
+                                onChange={onChange}
+                                placeholder="Selecione um material leve"
+                              />
+                            )}
+                          />
+                        </div>
+                        <div className="w-24 flex-shrink-0">
+                          <FieldLabel htmlFor={`light-min-${index}`} className="sr-only">
+                            Min.
+                          </FieldLabel>
+                          <Input
+                            id={`light-min-${index}`}
+                            type="number"
+                            min="0"
+                            step="1"
+                            placeholder="Min."
+                            error={!!errors.lightTools?.[index]?.timeMinutes}
+                            {...register(`lightTools.${index}.timeMinutes`)}
+                          />
+                        </div>
+                        <span className="text-sm text-gray-600 w-20 text-right pt-2">
+                          {formatBRL(subtotal)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeLightTool(index)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-rose-50 rounded-lg transition mt-0.5"
+                          aria-label="Remover material leve"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      {(errors.lightTools?.[index]?.toolId || errors.lightTools?.[index]?.timeMinutes) && (
+                        <FieldError>
+                          {errors.lightTools[index]?.toolId?.message ??
+                            errors.lightTools[index]?.timeMinutes?.message}
+                        </FieldError>
+                      )}
+                    </div>
+                  )
+                })}
+                {lightToolFields.length === 0 && (
+                  <p className="text-sm text-gray-500">Nenhum material leve adicionado.</p>
+                )}
+              </div>
+              <div className="mt-4">
+                <Button
+                  variant="ghost"
+                  type="button"
+                  onClick={() => appendLightTool({ toolId: '', timeMinutes: 0 })}
+                >
+                  + Adicionar material leve
+                </Button>
               </div>
             </Card>
 
@@ -382,6 +537,10 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Máquina</span>
                   <span className="font-medium text-gray-800">{formatBRL(custo.machineCost)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Materiais leves</span>
+                  <span className="font-medium text-gray-800">{formatBRL(custo.lightToolCost)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Mão de obra</span>

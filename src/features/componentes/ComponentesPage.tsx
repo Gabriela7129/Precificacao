@@ -39,14 +39,24 @@ export function ComponentesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {ativos.map((componente) => {
-            const totalMinutos = Math.round(
-              (componente.machineTimeHours + componente.humanTimeHours) * 60,
+            const totalMachineMinutes = componente.machineAssets.reduce(
+              (sum, l) => sum + (l.timeMinutes || 0),
+              0,
             )
+            const totalLightMinutes = componente.lightTools.reduce(
+              (sum, l) => sum + (l.timeMinutes || 0),
+              0,
+            )
+            const totalHumanMinutes = Math.round(componente.humanTimeHours * 60)
+            const totalMinutos = totalMachineMinutes + totalLightMinutes + totalHumanMinutes
             const meta = [
               `${componente.supplies.length} ${componente.supplies.length === 1 ? 'insumo' : 'insumos'}`,
-              componente.machineAssetId ? '1 ativo' : 'sem ativo',
+              `${componente.machineAssets.length} ${componente.machineAssets.length === 1 ? 'ativo' : 'ativos'}`,
+              componente.lightTools.length > 0 ? `${componente.lightTools.length} mat. leve` : undefined,
               formatMinutes(totalMinutos),
-            ].join(' · ')
+            ]
+              .filter(Boolean)
+              .join(' · ')
 
             return (
               <Card

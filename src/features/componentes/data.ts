@@ -10,14 +10,18 @@ import {
   createComponent,
   updateComponent,
   useHeavyAssets,
+  useLightTools,
   useSettings,
   useSupplies,
 } from '../../services/firestore'
 import { componentUnitCost } from '../../lib/calculations'
 import type {
+  ComponentLightToolLine,
+  ComponentMachineLine,
   ComponentSupplyLine,
   HeavyAsset,
   HumanProfile,
+  LightTool,
   SemiFinishedComponent,
   Supply,
   WithId,
@@ -44,17 +48,20 @@ export function useWorkspaceSettings(): {
 export function useComposicaoData(): {
   supplies: WithId<Supply>[]
   heavyAssets: WithId<HeavyAsset>[]
+  lightTools: WithId<LightTool>[]
   settings: WithId<WorkspaceSettings> | null
   loading: boolean
 } {
   const suppliesState = useSupplies()
   const assetsState = useHeavyAssets()
+  const lightToolsState = useLightTools()
   const { settings, loading: settingsLoading } = useWorkspaceSettings()
   return {
     supplies: suppliesState.data.filter((s) => s.isActive),
     heavyAssets: assetsState.data,
+    lightTools: lightToolsState.data.filter((t) => t.isActive),
     settings,
-    loading: suppliesState.loading || assetsState.loading || settingsLoading,
+    loading: suppliesState.loading || assetsState.loading || lightToolsState.loading || settingsLoading,
   }
 }
 
@@ -65,9 +72,10 @@ export function useComposicaoData(): {
 export interface ComposicaoCustoInput {
   /** Linhas em edição (sem snapshot — o custo médio atual é aplicado aqui). */
   supplies: { supplyId: string; quantity: number }[]
-  /** `null`/vazio = sem tempo de máquina. */
-  machineAssetId: string | null
-  machineTimeMinutes: number
+  /** Lista de ativos pesados + tempo em minutos. */
+  machineAssets: { assetId: string; timeMinutes: number }[]
+  /** Lista de materiais leves + tempo em minutos. */
+  lightTools: { toolId: string; timeMinutes: number }[]
   humanProfile: HumanProfile
   humanTimeMinutes: number
 }
@@ -75,33 +83,30 @@ export interface ComposicaoCustoInput {
 export interface ComposicaoCusto {
   /** Linhas prontas para persistir, com `unitCostSnapshot` do momento. */
   lines: ComponentSupplyLine[]
+  machineLines: ComponentMachineLine[]
+  lightToolLines: ComponentLightToolLine[]
   suppliesCost: number
   machineCost: number
+  lightToolCost: number
   humanCost: number
   unitCost: number
-  machineTimeHours: number
   humanTimeHours: number
 }
 
 /**
- * Recalcula o custo da composição com os custos ATUAIS de insumos, ativo e
- * valor hora das settings. Toda a matemática passa por `calculations.ts`;
- * aqui só resolvemos as referências (insumo → custo médio, ativo →
- * custo/hora, perfil → valor hora) e convertemos minutos → horas.
+ * Recalcula o custo da composição com os custos ATUAIS de insumos, ativos
+ * pesados, materiais leves e valor hora das settings. Toda a matemática passa
+ * por `calculations.ts`; aqui só resolvemos as referências e convertemos
+ * minutos → horas.
  */
 export function calcularCustoComposicao(
   input: ComposicaoCustoInput,
   supplies: WithId<Supply>[],
   heavyAssets: WithId<HeavyAsset>[],
+  lightTools: WithId<LightTool>[],
   settings: WithId<WorkspaceSettings> | null,
 ): ComposicaoCusto {
-  const machineTimeHours = input.machineTimeMinutes / 60
   const humanTimeHours = input.humanTimeMinutes / 60
-
-  const asset = input.machineAssetId
-    ? heavyAssets.find((a) => a.id === input.machineAssetId)
-    : undefined
-  const machineCostPerHour = asset?.totalCostPerHour ?? 0
 
   const humanHourlyRate =
     input.humanProfile === 'creative'
@@ -117,19 +122,58 @@ export function calcularCustoComposicao(
       unitCostSnapshot: supplies.find((s) => s.id === l.supplyId)?.averageCost ?? 0,
     }))
 
+  // Ativos pesados: tempo em minutos → horas + snapshot custo/hora.
+  const machineLines: ComponentMachineLine[] = input.machineAssets
+    .filter((l) => l.assetId !== '')
+    .map((l) => {
+      const asset = heavyAssets.find((a) => a.id === l.assetId)
+      return {
+        assetId: l.assetId,
+        timeMinutes: l.timeMinutes,
+        costPerHourSnapshot: asset?.totalCostPerHour ?? 0,
+      }
+    })
+
+  // Materiais leves: tempo em minutos → horas + snapshot rateio/hora.
+  const lightToolLines: ComponentLightToolLine[] = input.lightTools
+    .filter((l) => l.toolId !== '')
+    .map((l) => {
+      const tool = lightTools.find((t) => t.id === l.toolId)
+      return {
+        toolId: l.toolId,
+        timeMinutes: l.timeMinutes,
+        costPerHourSnapshot: tool?.monthlyMaintenanceCost ?? 0,
+      }
+    })
+
   const suppliesCost = lines.reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
-  const machineCost = machineTimeHours * machineCostPerHour
+  const machineCost = machineLines.reduce(
+    (sum, l) => sum + (l.timeMinutes / 60) * l.costPerHourSnapshot,
+    0,
+  )
+  const lightToolCost = lightToolLines.reduce(
+    (sum, l) => sum + (l.timeMinutes / 60) * l.costPerHourSnapshot,
+    0,
+  )
   const humanCost = humanTimeHours * humanHourlyRate
 
   const unitCost = componentUnitCost({
     supplies: lines,
-    machineTimeHours,
-    machineCostPerHour,
+    machineAssets: machineLines.map((l) => ({
+      assetId: l.assetId,
+      timeHours: l.timeMinutes / 60,
+      costPerHour: l.costPerHourSnapshot,
+    })),
+    lightTools: lightToolLines.map((l) => ({
+      toolId: l.toolId,
+      timeHours: l.timeMinutes / 60,
+      costPerHour: l.costPerHourSnapshot,
+    })),
     humanTimeHours,
     humanHourlyRate,
   })
 
-  return { lines, suppliesCost, machineCost, humanCost, unitCost, machineTimeHours, humanTimeHours }
+  return { lines, machineLines, lightToolLines, suppliesCost, machineCost, lightToolCost, humanCost, unitCost, humanTimeHours }
 }
 
 // ---------------------------------------------------------------------------
@@ -146,18 +190,20 @@ export async function reavaliarComponente(
   atual: WithId<SemiFinishedComponent>,
   supplies: WithId<Supply>[],
   heavyAssets: WithId<HeavyAsset>[],
+  lightTools: WithId<LightTool>[],
   settings: WithId<WorkspaceSettings> | null,
 ): Promise<string> {
   const custo = calcularCustoComposicao(
     {
       supplies: atual.supplies.map((l) => ({ supplyId: l.supplyId, quantity: l.quantity })),
-      machineAssetId: atual.machineAssetId,
-      machineTimeMinutes: atual.machineTimeHours * 60,
+      machineAssets: atual.machineAssets.map((l) => ({ assetId: l.assetId, timeMinutes: l.timeMinutes })),
+      lightTools: atual.lightTools.map((l) => ({ toolId: l.toolId, timeMinutes: l.timeMinutes })),
       humanProfile: atual.humanProfile,
       humanTimeMinutes: atual.humanTimeHours * 60,
     },
     supplies,
     heavyAssets,
+    lightTools,
     settings,
   )
 
@@ -165,8 +211,8 @@ export async function reavaliarComponente(
   return createComponent(wsId, {
     name: atual.name,
     supplies: custo.lines,
-    machineTimeHours: custo.machineTimeHours,
-    machineAssetId: atual.machineAssetId,
+    machineAssets: custo.machineLines,
+    lightTools: custo.lightToolLines,
     humanTimeHours: custo.humanTimeHours,
     humanProfile: atual.humanProfile,
     unitCost: custo.unitCost,

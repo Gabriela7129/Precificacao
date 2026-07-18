@@ -145,15 +145,31 @@ export interface ComponentSupplyLine {
   unitCostSnapshot: number
 }
 
+export interface ComponentMachineLine {
+  assetId: string
+  timeMinutes: number
+  /** Snapshot do custo/hora do ativo na data da composição. */
+  costPerHourSnapshot: number
+}
+
+export interface ComponentLightToolLine {
+  toolId: string
+  timeMinutes: number
+  /** Snapshot do custo/hora de mão de obra + material leve na data da composição. */
+  costPerHourSnapshot: number
+}
+
 export interface SemiFinishedComponent {
   workspaceId: string
   name: string
   supplies: ComponentSupplyLine[]
-  machineTimeHours: number
-  /** `null` = sem tempo de máquina. */
-  machineAssetId: string | null
-  humanTimeHours: number
+  /** Lista de ativos pesados utilizados neste componente. */
+  machineAssets: ComponentMachineLine[]
+  /** Lista de materiais leves utilizados neste componente. */
+  lightTools: ComponentLightToolLine[]
   humanProfile: HumanProfile
+  /** Tempo de mão de obra em horas. */
+  humanTimeHours: number
   /** Custo unitário calculado (snapshot). */
   unitCost: number
   version: number

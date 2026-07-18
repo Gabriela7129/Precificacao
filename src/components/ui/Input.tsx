@@ -10,6 +10,12 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   surface?: 'default' | 'white'
 }
 
+export interface FieldLabelProps {
+  children: ReactNode
+  htmlFor?: string
+  className?: string
+}
+
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   { error = false, surface = 'default', className = '', ...props },
   ref,
@@ -45,9 +51,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
 })
 
 /** Label canônico de formulário. */
-export function FieldLabel({ children, htmlFor }: { children: ReactNode; htmlFor?: string }) {
+export function FieldLabel({ children, htmlFor, className = '' }: FieldLabelProps) {
   return (
-    <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">
+    <label htmlFor={htmlFor} className={`block text-sm font-medium text-gray-700 mb-1 ${className}`}>
       {children}
     </label>
   )
