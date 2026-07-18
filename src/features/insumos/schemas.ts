@@ -13,7 +13,7 @@ export const supplyFormSchema = z.object({
   initialStock: z
     .number({ invalid_type_error: 'Obrigatório' })
     .min(0, 'Não pode ser negativo'),
-  initialAverageCost: z
+  totalValue: z
     .number({ invalid_type_error: 'Obrigatório' })
     .min(0, 'Não pode ser negativo'),
 })

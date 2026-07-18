@@ -47,7 +47,7 @@ const emptyValues: SupplyFormValues = {
   unit: '',
   categoryId: '',
   initialStock: 0,
-  initialAverageCost: 0,
+  totalValue: 0,
 }
 
 export function InsumoFormModal({
@@ -82,7 +82,7 @@ export function InsumoFormModal({
             unit: supply.unit,
             categoryId: supply.categoryId,
             initialStock: supply.currentStock,
-            initialAverageCost: supply.averageCost,
+            totalValue: supply.currentStock * supply.averageCost,
           }
         : emptyValues,
     )
@@ -90,15 +90,18 @@ export function InsumoFormModal({
 
   const sortedCategories = [...categories].sort((a, b) => a.order - b.order)
 
-  const [watchedStock, watchedCost] = watch(['initialStock', 'initialAverageCost'])
-  const previewTotal =
-    Number.isFinite(watchedStock) && Number.isFinite(watchedCost)
-      ? watchedStock * watchedCost
+  const [watchedStock, watchedTotal] = watch(['initialStock', 'totalValue'])
+  const computedAverageCost =
+    Number.isFinite(watchedStock) && watchedStock > 0 && Number.isFinite(watchedTotal) && watchedTotal >= 0
+      ? watchedTotal / watchedStock
       : 0
+  const previewTotal = computedAverageCost * (Number.isFinite(watchedStock) ? watchedStock : 0)
 
   const onSubmit = handleSubmit(async (values) => {
     if (!wsId) return
     try {
+      const averageCost =
+        values.initialStock > 0 ? values.totalValue / values.initialStock : 0
       if (isEdit && supply) {
         await updateSupply(wsId, supply.id, {
           name: values.name.trim(),
@@ -111,8 +114,8 @@ export function InsumoFormModal({
           unit: values.unit.trim(),
           categoryId: values.categoryId,
           currentStock: values.initialStock,
-          averageCost: values.initialAverageCost,
-          totalStockValue: values.initialStock * values.initialAverageCost,
+          averageCost,
+          totalStockValue: values.totalValue,
           isActive: true,
         })
       }
@@ -227,23 +230,23 @@ export function InsumoFormModal({
           </div>
           <div className="flex-1">
             <FieldLabel htmlFor="insumo-custo">
-              {isEdit ? 'Custo médio (R$)' : 'Custo médio inicial (R$)'}
+              {isEdit ? 'Custo médio (R$)' : 'Valor total pago (R$)'}
             </FieldLabel>
             <Controller
               control={control}
-              name="initialAverageCost"
+              name="totalValue"
               render={({ field }) => (
                 <CurrencyInput
                   id="insumo-custo"
                   value={field.value}
                   onChange={(value) => field.onChange(value ?? 0)}
                   disabled={isEdit}
-                  error={!!errors.initialAverageCost}
+                  error={!!errors.totalValue}
                 />
               )}
             />
-            {errors.initialAverageCost && (
-              <FieldError>{errors.initialAverageCost.message}</FieldError>
+            {errors.totalValue && (
+              <FieldError>{errors.totalValue.message}</FieldError>
             )}
           </div>
         </div>
@@ -252,7 +255,11 @@ export function InsumoFormModal({
         )}
 
         {!isEdit && (
-          <div className="bg-amber-50 rounded-xl p-3 text-sm">
+          <div className="bg-amber-50 rounded-xl p-3 text-sm space-y-1">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Custo médio unitário</span>
+              <span className="font-medium text-gray-900">{formatBRL(computedAverageCost)}</span>
+            </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Valor total em estoque</span>
               <span className="font-medium text-gray-900">{formatBRL(previewTotal)}</span>
