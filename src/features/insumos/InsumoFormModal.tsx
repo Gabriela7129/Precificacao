@@ -26,6 +26,7 @@ import {
   useActiveWorkspaceId,
   useSupplyCategories,
 } from '../../services/firestore'
+import { todayYmd } from './data'
 import type { Supply, SupplyCategory, WithId } from '../../types'
 import { supplyFormSchema, type SupplyFormValues } from './schemas'
 
@@ -46,6 +47,7 @@ const emptyValues: SupplyFormValues = {
   name: '',
   unit: '',
   categoryId: '',
+  purchaseDate: '',
   initialStock: 0,
   totalValue: 0,
 }
@@ -81,6 +83,7 @@ export function InsumoFormModal({
             name: supply.name,
             unit: supply.unit,
             categoryId: supply.categoryId,
+            purchaseDate: '',
             initialStock: supply.currentStock,
             totalValue: supply.currentStock * supply.averageCost,
           }
@@ -113,6 +116,7 @@ export function InsumoFormModal({
           name: values.name.trim(),
           unit: values.unit.trim(),
           categoryId: values.categoryId,
+          purchaseDate: values.purchaseDate || todayYmd(),
           currentStock: values.initialStock,
           averageCost,
           totalStockValue: values.totalValue,
@@ -209,6 +213,18 @@ export function InsumoFormModal({
             )}
           />
           {errors.categoryId && <FieldError>{errors.categoryId.message}</FieldError>}
+        </div>
+
+        <div>
+          <FieldLabel htmlFor="insumo-data">Data da primeira compra</FieldLabel>
+          <Input
+            id="insumo-data"
+            type="date"
+            disabled={isEdit}
+            error={!!errors.purchaseDate}
+            {...register('purchaseDate')}
+          />
+          {errors.purchaseDate && <FieldError>{errors.purchaseDate.message}</FieldError>}
         </div>
 
         <div className="flex gap-4">

@@ -9,6 +9,7 @@ import { Card } from '../../components/ui/Card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { FieldError, FieldLabel, Input, Select } from '../../components/ui/Input'
+import { SelectSearchable } from '../../components/ui'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { PercentInput } from '../../components/ui/PercentInput'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
@@ -21,7 +22,6 @@ import {
   useActiveWorkspaceId,
   useMarketplaces,
   useSemiFinishedComponents,
-  useSupplies,
 } from '../../services/firestore'
 import type { HumanProfile, ProductComponentLine, ProductPackagingLine } from '../../types'
 import { hourlyRateForProfile, useProduct, useSettingsDoc } from './data'
@@ -38,6 +38,7 @@ const emptyDefaults: ProductFormValues = {
   name: '',
   components: [],
   packaging: [],
+  // snapshots are populated on edit; create leaves them null
   finalHumanTimeMinutes: 0,
   finalHumanProfile: 'operational',
   profitMargin: null,
@@ -58,16 +59,14 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
   const { product, loading: loadingProduct } = useProduct(mode === 'edit' ? id : undefined)
   const { settings } = useSettingsDoc()
   const { data: components, loading: loadingComponents } = useSemiFinishedComponents()
-  const { data: supplies, loading: loadingSupplies } = useSupplies()
   const { data: marketplaces, loading: loadingMarketplaces } = useMarketplaces()
 
   const [saving, setSaving] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
 
-  const activeComponents = useMemo(() => components.filter((c) => !c.isArchived), [components])
-  const activeSupplies = useMemo(() => supplies.filter((s) => s.isActive), [supplies])
+  const activeComponents = useMemo(() => components.filter((c) => !c.isArchived && !c.isPackaging), [components])
+  const packagingComponents = useMemo(() => components.filter((c) => !c.isArchived && c.isPackaging), [components])
   const componentsById = useMemo(() => new Map(components.map((c) => [c.id, c])), [components])
-  const suppliesById = useMemo(() => new Map(supplies.map((s) => [s.id, s])), [supplies])
 
   const {
     register,
@@ -101,8 +100,8 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
     if (mode !== 'edit' || !product) return
     reset({
       name: product.name,
-      components: product.components.map((l) => ({ componentId: l.componentId, quantity: l.quantity })),
-      packaging: product.packaging.map((l) => ({ supplyId: l.supplyId, quantity: l.quantity })),
+      components: product.components.map((l) => ({ componentId: l.componentId, quantity: l.quantity, unitCostSnapshot: l.unitCostSnapshot })),
+      packaging: product.packaging.map((l) => ({ componentId: l.componentId ?? l.supplyId, quantity: l.quantity, unitCostSnapshot: l.unitCostSnapshot })),
       finalHumanTimeMinutes: Math.round(product.finalHumanTimeHours * 60),
       finalHumanProfile: product.finalHumanProfile,
       profitMargin: product.profitMargin,
@@ -131,11 +130,11 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
         unitCostSnapshot: componentsById.get(l.componentId)?.unitCost ?? 0,
       }))
     const packagingLines: ProductPackagingLine[] = (values.packaging ?? [])
-      .filter((l) => l.supplyId && Number.isFinite(l.quantity))
+      .filter((l) => l.componentId && Number.isFinite(l.quantity))
       .map((l) => ({
-        supplyId: l.supplyId,
+        componentId: l.componentId,
         quantity: l.quantity,
-        unitCostSnapshot: suppliesById.get(l.supplyId)?.averageCost ?? 0,
+        unitCostSnapshot: componentsById.get(l.componentId)?.unitCost ?? 0,
       }))
     const profile = values.finalHumanProfile ?? 'operational'
     const hourlyRate = hourlyRateForProfile(settings, profile)
@@ -154,7 +153,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
       desiredNetValue: values.desiredNetValue ?? null,
     })
     return { componentLines, packagingLines, finalHumanTimeHours, directCost, marketplace, pricing }
-  }, [values, componentsById, suppliesById, settings, marketplaces])
+  }, [values, componentsById, settings, marketplaces])
 
   const handleCancel = () => {
     if (isDirty) setDiscardOpen(true)
@@ -192,7 +191,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
   }
 
   const firstLoading =
-    loadingComponents || loadingSupplies || loadingMarketplaces || (mode === 'edit' && loadingProduct)
+    loadingComponents || loadingMarketplaces || (mode === 'edit' && loadingProduct)
 
   if (mode === 'edit' && !loadingProduct && !product) {
     return (
@@ -238,9 +237,11 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                 <div className="space-y-3">
                   {componentFields.fields.map((field, index) => {
                     const line = values.components?.[index]
-                    const unitCost = line?.componentId
-                      ? (componentsById.get(line.componentId)?.unitCost ?? 0)
-                      : null
+                    const component = line?.componentId ? componentsById.get(line.componentId) : undefined
+                    const currentUnitCost = component?.unitCost ?? null
+                    const savedSnapshot = line?.unitCostSnapshot
+                    const hasChanged = currentUnitCost != null && savedSnapshot != null && Math.abs(currentUnitCost - savedSnapshot) > 1e-6
+                    const unitCost = currentUnitCost
                     const subtotal =
                       unitCost != null && Number.isFinite(line?.quantity)
                         ? unitCost * (line?.quantity ?? 0)
@@ -248,19 +249,27 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                     return (
                       <div key={field.id} className="flex gap-3 items-start">
                         <div className="flex-1">
-                          <Select
-                            error={!!errors.components?.[index]?.componentId}
-                            {...register(`components.${index}.componentId`)}
-                          >
-                            <option value="">Selecione um componente</option>
-                            {activeComponents.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))}
-                          </Select>
+                          <Controller
+                            control={control}
+                            name={`components.${index}.componentId`}
+                            render={({ field: { onChange, value } }) => (
+                              <SelectSearchable
+                                options={activeComponents
+                                  .filter((c) => !values.components?.some((existing, i) => existing.componentId === c.id && i !== index))
+                                  .map((c) => ({ value: c.id, label: c.name }))}
+                                value={value}
+                                onChange={onChange}
+                                placeholder="Selecione um componente"
+                              />
+                            )}
+                          />
                           {errors.components?.[index]?.componentId && (
                             <FieldError>{errors.components?.[index]?.componentId?.message}</FieldError>
+                          )}
+                          {hasChanged && (
+                            <p className="text-xs text-amber-600 mt-1">
+                              Valor atual: {formatBRL(currentUnitCost)} — atualize se quiser usar o novo custo.
+                            </p>
                           )}
                         </div>
                         <div className="w-28">
@@ -295,40 +304,52 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => componentFields.append({ componentId: '', quantity: 1 })}
+                    onClick={() => componentFields.append({ componentId: '', quantity: 1, unitCostSnapshot: null })}
                   >
                     <Plus className="w-4 h-4" /> Adicionar componente
                   </Button>
                 </div>
               </Card>
 
-              {/* Embalagem — insumos avulsos */}
+              {/* Embalagem — componentes marcados como embalagem */}
               <Card>
                 <h3 className="font-semibold text-gray-900 mb-4">Embalagem</h3>
                 <div className="space-y-3">
                   {packagingFields.fields.map((field, index) => {
                     const line = values.packaging?.[index]
-                    const supply = line?.supplyId ? suppliesById.get(line.supplyId) : undefined
+                    const component = line?.componentId ? componentsById.get(line.componentId) : undefined
+                    const currentUnitCost = component?.unitCost ?? null
+                    const savedSnapshot = line?.unitCostSnapshot
+                    const hasChanged = currentUnitCost != null && savedSnapshot != null && Math.abs(currentUnitCost - savedSnapshot) > 1e-6
+                    const unitCost = currentUnitCost
                     const subtotal =
-                      supply && Number.isFinite(line?.quantity)
-                        ? supply.averageCost * (line?.quantity ?? 0)
+                      unitCost != null && Number.isFinite(line?.quantity)
+                        ? unitCost * (line?.quantity ?? 0)
                         : null
                     return (
                       <div key={field.id} className="flex gap-3 items-start">
                         <div className="flex-1">
-                          <Select
-                            error={!!errors.packaging?.[index]?.supplyId}
-                            {...register(`packaging.${index}.supplyId`)}
-                          >
-                            <option value="">Selecione um insumo</option>
-                            {activeSupplies.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name} ({s.unit})
-                              </option>
-                            ))}
-                          </Select>
-                          {errors.packaging?.[index]?.supplyId && (
-                            <FieldError>{errors.packaging?.[index]?.supplyId?.message}</FieldError>
+                          <Controller
+                            control={control}
+                            name={`packaging.${index}.componentId`}
+                            render={({ field: { onChange, value } }) => (
+                              <SelectSearchable
+                                options={packagingComponents
+                                  .filter((c) => !values.packaging?.some((existing, i) => existing.componentId === c.id && i !== index))
+                                  .map((c) => ({ value: c.id, label: c.name }))}
+                                value={value}
+                                onChange={onChange}
+                                placeholder="Selecione uma embalagem"
+                              />
+                            )}
+                          />
+                          {errors.packaging?.[index]?.componentId && (
+                            <FieldError>{errors.packaging?.[index]?.componentId?.message}</FieldError>
+                          )}
+                          {hasChanged && (
+                            <p className="text-xs text-amber-600 mt-1">
+                              Valor atual: {formatBRL(currentUnitCost)} — atualize se quiser usar o novo custo.
+                            </p>
                           )}
                         </div>
                         <div className="w-28">
@@ -363,7 +384,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => packagingFields.append({ supplyId: '', quantity: 1 })}
+                    onClick={() => packagingFields.append({ componentId: '', quantity: 1, unitCostSnapshot: null })}
                   >
                     <Plus className="w-4 h-4" /> Adicionar embalagem
                   </Button>

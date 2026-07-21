@@ -177,6 +177,33 @@ export function calcularCustoComposicao(
 }
 
 // ---------------------------------------------------------------------------
+// Duplicação: cria um componente novo (v1) com a mesma composição e snapshots
+// ---------------------------------------------------------------------------
+
+/**
+ * Cria uma cópia do componente como NOVO documento: mesma composição,
+ * snapshots e custo unitário, nome com sufixo "(cópia)", `version: 1` e
+ * histórico independente. O original permanece intacto. Retorna o id da cópia.
+ */
+export async function duplicarComponente(
+  wsId: string,
+  origem: WithId<SemiFinishedComponent>,
+): Promise<string> {
+  return createComponent(wsId, {
+    name: `${origem.name} (cópia)`,
+    isPackaging: origem.isPackaging ?? false,
+    supplies: (origem.supplies ?? []).map((l) => ({ ...l })),
+    machineAssets: (origem.machineAssets ?? []).map((l) => ({ ...l })),
+    lightTools: (origem.lightTools ?? []).map((l) => ({ ...l })),
+    humanTimeHours: origem.humanTimeHours,
+    humanProfile: origem.humanProfile,
+    unitCost: origem.unitCost,
+    version: 1,
+    isArchived: false,
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Reavaliação (integridade histórica): arquiva a versão atual e cria a próxima
 // ---------------------------------------------------------------------------
 
@@ -195,9 +222,9 @@ export async function reavaliarComponente(
 ): Promise<string> {
   const custo = calcularCustoComposicao(
     {
-      supplies: atual.supplies.map((l) => ({ supplyId: l.supplyId, quantity: l.quantity })),
-      machineAssets: atual.machineAssets.map((l) => ({ assetId: l.assetId, timeMinutes: l.timeMinutes })),
-      lightTools: atual.lightTools.map((l) => ({ toolId: l.toolId, timeMinutes: l.timeMinutes })),
+      supplies: (atual.supplies ?? []).map((l) => ({ supplyId: l.supplyId, quantity: l.quantity })),
+      machineAssets: (atual.machineAssets ?? []).map((l) => ({ assetId: l.assetId, timeMinutes: l.timeMinutes })),
+      lightTools: (atual.lightTools ?? []).map((l) => ({ toolId: l.toolId, timeMinutes: l.timeMinutes })),
       humanProfile: atual.humanProfile,
       humanTimeMinutes: atual.humanTimeHours * 60,
     },
@@ -210,6 +237,7 @@ export async function reavaliarComponente(
   await updateComponent(wsId, atual.id, { isArchived: true })
   return createComponent(wsId, {
     name: atual.name,
+    isPackaging: atual.isPackaging ?? false,
     supplies: custo.lines,
     machineAssets: custo.machineLines,
     lightTools: custo.lightToolLines,

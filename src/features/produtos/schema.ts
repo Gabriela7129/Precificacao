@@ -15,12 +15,16 @@ export const productFormSchema = z.object({
     z.object({
       componentId: z.string().min(1, 'Selecione um componente'),
       quantity: quantitySchema,
+      /** Snapshot salvo do custo unitário no momento da montagem (para detectar valores desatualizados). */
+      unitCostSnapshot: z.number().nullable(),
     }),
   ),
   packaging: z.array(
     z.object({
-      supplyId: z.string().min(1, 'Selecione um insumo'),
+      componentId: z.string().min(1, 'Selecione uma embalagem'),
       quantity: quantitySchema,
+      /** Snapshot salvo do custo unitário no momento da montagem (para detectar valores desatualizados). */
+      unitCostSnapshot: z.number().nullable(),
     }),
   ),
   /** Tempo de acabamento final, em MINUTOS na UI. */

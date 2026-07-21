@@ -66,6 +66,7 @@ const lightToolLineSchema = z.object({
 
 const componentFormSchema = z.object({
   name: z.string().min(2, 'Informe um nome com pelo menos 2 caracteres'),
+  isPackaging: z.boolean(),
   supplies: z.array(supplyLineSchema),
   machineAssets: z.array(machineLineSchema),
   lightTools: z.array(lightToolLineSchema),
@@ -108,15 +109,16 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
     defaultValues: componente
       ? {
           name: componente.name,
-          supplies: componente.supplies.map((l) => ({
+          isPackaging: componente.isPackaging ?? false,
+          supplies: (componente.supplies ?? []).map((l) => ({
             supplyId: l.supplyId,
             quantity: l.quantity,
           })),
-          machineAssets: componente.machineAssets.map((l) => ({
+          machineAssets: (componente.machineAssets ?? []).map((l) => ({
             assetId: l.assetId,
             timeMinutes: l.timeMinutes,
           })),
-          lightTools: componente.lightTools.map((l) => ({
+          lightTools: (componente.lightTools ?? []).map((l) => ({
             toolId: l.toolId,
             timeMinutes: l.timeMinutes,
           })),
@@ -125,6 +127,7 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
         }
       : {
           name: '',
+          isPackaging: false,
           supplies: [],
           machineAssets: [],
           lightTools: [],
@@ -172,6 +175,7 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
     try {
       const payload = {
         name: formValues.name.trim(),
+        isPackaging: formValues.isPackaging,
         supplies: custo.lines,
         machineAssets: custo.machineLines,
         lightTools: custo.lightToolLines,
@@ -182,7 +186,7 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
       if (componente) {
         await updateComponent(wsId, componente.id, payload)
       } else {
-        await createComponent(wsId, { ...payload, version: 1, isArchived: false })
+        await createComponent(wsId, { ...payload, version: 1, isArchived: false, isPackaging: formValues.isPackaging })
       }
       toast.success('Componente salvo com sucesso')
       navigate('/componentes')
@@ -240,15 +244,25 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
           <fieldset disabled={readOnly} className="lg:col-span-2 space-y-6 border-0 p-0 m-0 min-w-0">
             <Card>
               <h2 className="font-semibold text-gray-900 mb-4">Dados básicos</h2>
-              <div>
-                <FieldLabel htmlFor="name">Nome do componente</FieldLabel>
-                <Input
-                  id="name"
-                  placeholder="Ex.: Miolo A5 Costurado"
-                  error={!!errors.name}
-                  {...register('name')}
-                />
-                {errors.name && <FieldError>{errors.name.message}</FieldError>}
+              <div className="space-y-4">
+                <div>
+                  <FieldLabel htmlFor="name">Nome do componente</FieldLabel>
+                  <Input
+                    id="name"
+                    placeholder="Ex.: Miolo A5 Costurado"
+                    error={!!errors.name}
+                    {...register('name')}
+                  />
+                  {errors.name && <FieldError>{errors.name.message}</FieldError>}
+                </div>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-5 h-5 rounded border-rose-200 text-rose-500 focus:ring-rose-400"
+                    {...register('isPackaging')}
+                  />
+                  <span className="text-sm text-gray-700">Este componente é uma embalagem</span>
+                </label>
               </div>
             </Card>
 
@@ -268,10 +282,12 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
                             name={`supplies.${index}.supplyId`}
                             render={({ field: { onChange, value } }) => (
                               <SelectSearchable
-                                options={supplies.map((s) => ({
-                                  value: s.id,
-                                  label: `${s.name} (${formatBRL(s.averageCost)}/${s.unit})`,
-                                }))}
+                                options={supplies
+                                  .filter((s) => !values.supplies?.some((existing, i) => existing.supplyId === s.id && i !== index))
+                                  .map((s) => ({
+                                    value: s.id,
+                                    label: `${s.name} (${formatBRL(s.averageCost)}/${s.unit})`,
+                                  }))}
                                 value={value}
                                 onChange={onChange}
                                 placeholder="Selecione um insumo"
@@ -345,10 +361,12 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
                             name={`machineAssets.${index}.assetId`}
                             render={({ field: { onChange, value } }) => (
                               <SelectSearchable
-                                options={heavyAssets.map((a) => ({
-                                  value: a.id,
-                                  label: `${a.name} (${formatBRL(a.totalCostPerHour)}/h)`,
-                                }))}
+                                options={heavyAssets
+                                  .filter((a) => !values.machineAssets?.some((existing, i) => existing.assetId === a.id && i !== index))
+                                  .map((a) => ({
+                                    value: a.id,
+                                    label: `${a.name} (${formatBRL(a.totalCostPerHour)}/h)`,
+                                  }))}
                                 value={value}
                                 onChange={onChange}
                                 placeholder="Selecione um ativo"
@@ -422,10 +440,12 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
                             name={`lightTools.${index}.toolId`}
                             render={({ field: { onChange, value } }) => (
                               <SelectSearchable
-                                options={lightTools.map((t) => ({
-                                  value: t.id,
-                                  label: `${t.name} (${formatBRL(t.monthlyMaintenanceCost)}/h)`,
-                                }))}
+                                options={lightTools
+                                  .filter((t) => !values.lightTools?.some((existing, i) => existing.toolId === t.id && i !== index))
+                                  .map((t) => ({
+                                    value: t.id,
+                                    label: `${t.name} (${formatBRL(t.monthlyMaintenanceCost)}/h)`,
+                                  }))}
                                 value={value}
                                 onChange={onChange}
                                 placeholder="Selecione um material leve"

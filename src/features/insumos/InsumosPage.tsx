@@ -40,6 +40,7 @@ import { CategoriasModal } from './CategoriasModal'
 import { EntradaEstoqueModal } from './EntradaEstoqueModal'
 import { InsumoFormModal } from './InsumoFormModal'
 import { downloadExcel, parseCurrency, parseExcelFile, parseNumber } from '../../lib/excel'
+import { todayYmd } from './data'
 import { ImportExportButtons } from '../../components/ui'
 
 /** Alterna a cor do Badge por hash da categoria (amber/rose, ver design.md). */
@@ -212,6 +213,7 @@ export function InsumosPage() {
         name,
         unit,
         categoryId,
+        purchaseDate: todayYmd(),
         currentStock: stock,
         averageCost: stock > 0 ? totalValue / stock : 0,
         totalStockValue: totalValue,

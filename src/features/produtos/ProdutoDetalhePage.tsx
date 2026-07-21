@@ -17,7 +17,6 @@ import {
   useActiveWorkspaceId,
   useMarketplaces,
   useSemiFinishedComponents,
-  useSupplies,
 } from '../../services/firestore'
 import type { ProductComponentLine, ProductPackagingLine } from '../../types'
 import { hourlyRateForProfile, useProduct, useProductVersions, useSettingsDoc } from './data'
@@ -35,7 +34,6 @@ export function ProdutoDetalhePage() {
   const { product, loading } = useProduct(id)
   const { settings } = useSettingsDoc()
   const { data: components } = useSemiFinishedComponents()
-  const { data: supplies } = useSupplies()
   const { data: marketplaces } = useMarketplaces()
   const versions = useProductVersions(product)
 
@@ -55,7 +53,6 @@ export function ProdutoDetalhePage() {
   }, [product?.id])
 
   const componentsById = useMemo(() => new Map(components.map((c) => [c.id, c])), [components])
-  const suppliesById = useMemo(() => new Map(supplies.map((s) => [s.id, s])), [supplies])
 
   const marketplace = useMemo(
     () => marketplaces.find((m) => m.id === marketplaceId) ?? null,
@@ -112,9 +109,9 @@ export function ProdutoDetalhePage() {
         unitCostSnapshot: componentsById.get(l.componentId)?.unitCost ?? l.unitCostSnapshot,
       }))
       const newPackagingLines: ProductPackagingLine[] = product.packaging.map((l) => ({
-        supplyId: l.supplyId,
+        componentId: l.componentId,
         quantity: l.quantity,
-        unitCostSnapshot: suppliesById.get(l.supplyId)?.averageCost ?? l.unitCostSnapshot,
+        unitCostSnapshot: componentsById.get(l.componentId ?? '')?.unitCost ?? l.unitCostSnapshot,
       }))
       const hourlyRate = hourlyRateForProfile(settings, product.finalHumanProfile)
       const directCost = productDirectCost({
@@ -247,11 +244,18 @@ export function ProdutoDetalhePage() {
             <div className="space-y-2">
               {product.components.map((line, i) => {
                 const component = componentsById.get(line.componentId)
+                const currentCost = component?.unitCost
+                const changed = currentCost != null && Math.abs(currentCost - line.unitCostSnapshot) > 1e-6
                 return (
                   <div key={`c-${i}`} className="flex justify-between items-center p-3 rounded-xl bg-rose-50">
                     <div>
                       <p className="font-medium text-gray-900 text-sm">
                         {component?.name ?? 'Componente removido'}
+                        {changed && (
+                          <span className="text-amber-600 ml-1">
+                            (atual: {formatBRL(currentCost)})
+                          </span>
+                        )}
                       </p>
                       <p className="text-xs text-gray-500">
                         Componente · {line.quantity} un × {formatBRL(line.unitCostSnapshot)}
@@ -264,16 +268,22 @@ export function ProdutoDetalhePage() {
                 )
               })}
               {product.packaging.map((line, i) => {
-                const supply = suppliesById.get(line.supplyId)
+                const component = componentsById.get(line.componentId ?? '')
+                const currentCost = component?.unitCost
+                const changed = currentCost != null && Math.abs(currentCost - line.unitCostSnapshot) > 1e-6
                 return (
                   <div key={`p-${i}`} className="flex justify-between items-center p-3 rounded-xl bg-rose-50">
                     <div>
                       <p className="font-medium text-gray-900 text-sm">
-                        {supply?.name ?? 'Insumo removido'}
+                        {component?.name ?? 'Embalagem removida'}
+                        {changed && (
+                          <span className="text-amber-600 ml-1">
+                            (atual: {formatBRL(currentCost)})
+                          </span>
+                        )}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Embalagem · {line.quantity} {supply?.unit ?? 'un'} ×{' '}
-                        {formatBRL(line.unitCostSnapshot)}
+                        Embalagem · {line.quantity} un × {formatBRL(line.unitCostSnapshot)}
                       </p>
                     </div>
                     <span className="font-medium text-gray-900 text-sm">

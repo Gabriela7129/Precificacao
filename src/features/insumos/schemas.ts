@@ -10,6 +10,7 @@ export const supplyFormSchema = z.object({
   name: z.string().trim().min(1, 'Obrigatório'),
   unit: z.string().trim().min(1, 'Obrigatório'),
   categoryId: z.string().min(1, 'Selecione uma categoria'),
+  purchaseDate: z.string().min(1, 'Informe a data da primeira compra'),
   initialStock: z
     .number({ invalid_type_error: 'Obrigatório' })
     .min(0, 'Não pode ser negativo'),

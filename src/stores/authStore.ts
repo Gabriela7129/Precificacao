@@ -47,7 +47,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   signInWithGoogle: async () => {
     await signInWithPopup(auth, googleProvider)
-    // onAuthStateChanged atualiza o store e cria o doc de usuário.
+    // onAuthStateChanged atualiza o store após o login.
   },
 
   logout: async () => {

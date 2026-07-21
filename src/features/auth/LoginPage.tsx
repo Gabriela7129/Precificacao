@@ -33,7 +33,9 @@ export function LoginPage() {
     setSubmitting(true)
     try {
       await signInWithGoogle()
-    } catch {
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[login] popup error:', err)
       toast.error('Não foi possível entrar. Tente novamente.')
       setSubmitting(false)
     }

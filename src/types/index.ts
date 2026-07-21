@@ -102,6 +102,8 @@ export interface Supply {
   averageCost: number
   /** currentStock × averageCost. */
   totalStockValue: number
+  /** Data da primeira compra/cadastro em "yyyy-mm-dd". */
+  purchaseDate: string
   isActive: boolean
 }
 
@@ -174,6 +176,8 @@ export interface SemiFinishedComponent {
   unitCost: number
   version: number
   isArchived: boolean
+  /** true = este componente é uma embalagem e só aparece na seção de embalagens do produto. */
+  isPackaging: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -187,9 +191,11 @@ export interface ProductComponentLine {
 }
 
 export interface ProductPackagingLine {
-  supplyId: string
+  /** Em produtos antigos era supplyId; novos usam componentId. Mantemos ambos opcionais para compatibilidade. */
+  supplyId?: string
+  componentId?: string
   quantity: number
-  /** Snapshot do custo médio do insumo de embalagem na data da montagem. */
+  /** Snapshot do custo unitário da embalagem na data da montagem. */
   unitCostSnapshot: number
 }
 
