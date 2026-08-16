@@ -83,7 +83,7 @@ export function InsumoFormModal({
             name: supply.name,
             unit: supply.unit,
             categoryId: supply.categoryId,
-            purchaseDate: '',
+            purchaseDate: supply.purchaseDate ?? '',
             initialStock: supply.currentStock,
             totalValue: supply.currentStock * supply.averageCost,
           }
@@ -110,6 +110,7 @@ export function InsumoFormModal({
           name: values.name.trim(),
           unit: values.unit.trim(),
           categoryId: values.categoryId,
+          purchaseDate: values.purchaseDate,
         })
       } else {
         await createSupply(wsId, {
@@ -220,7 +221,6 @@ export function InsumoFormModal({
           <Input
             id="insumo-data"
             type="date"
-            disabled={isEdit}
             error={!!errors.purchaseDate}
             {...register('purchaseDate')}
           />

@@ -4,19 +4,22 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Copy, Pencil, Wrench } from 'lucide-react'
+import { Copy, Pencil, Trash2, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
-import { Badge, Button, CardsSkeleton, EmptyState, PageHeader } from '../../components/ui'
+import { Badge, Button, CardsSkeleton, ConfirmDialog, EmptyState, PageHeader } from '../../components/ui'
 import { Card } from '../../components/ui'
-import { useActiveWorkspaceId, useSemiFinishedComponents } from '../../services/firestore'
+import { useActiveWorkspaceId, useProducts, useSemiFinishedComponents } from '../../services/firestore'
 import { formatBRL, formatMinutes } from '../../lib/format'
-import { duplicarComponente } from './data'
+import { duplicarComponente, excluirComponente } from './data'
 
 export function ComponentesPage() {
   const navigate = useNavigate()
   const wsId = useActiveWorkspaceId()
   const { data, loading } = useSemiFinishedComponents()
+  const { data: products } = useProducts()
   const [duplicandoId, setDuplicandoId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<(typeof data)[number] | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const handleDuplicar = async (componente: (typeof data)[number]) => {
     if (!wsId || duplicandoId) return
@@ -30,6 +33,38 @@ export function ComponentesPage() {
       setDuplicandoId(null)
     }
   }
+
+  /** Produtos ativos que usam este componente (composição ou embalagem). */
+  const usadoEmProdutos = (componente: (typeof data)[number]) =>
+    products.filter(
+      (p) =>
+        !p.isArchived &&
+        (p.components.some((l) => l.componentId === componente.id) ||
+          p.packaging.some((l) => l.componentId === componente.id)),
+    )
+
+  const handleDelete = async () => {
+    if (!wsId || !deleteTarget) return
+    setDeleting(true)
+    try {
+      const removidos = await excluirComponente(wsId, deleteTarget, data)
+      toast.success(
+        removidos > 1
+          ? `Componente excluído (${removidos} versões)`
+          : 'Componente excluído',
+      )
+      setDeleteTarget(null)
+    } catch {
+      toast.error('Não foi possível excluir. Tente novamente.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const deleteProductCount = deleteTarget ? usadoEmProdutos(deleteTarget).length : 0
+  const deleteVersions = deleteTarget
+    ? data.filter((c) => c.name === deleteTarget.name).length
+    : 0
 
   const ativos = data
     .filter((c) => !c.isArchived && !c.isPackaging)
@@ -111,6 +146,18 @@ export function ComponentesPage() {
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
+                    <button
+                      type="button"
+                      aria-label="Excluir componente"
+                      title="Excluir componente"
+                      className="p-1.5 rounded-lg text-gray-500 hover:bg-rose-100 hover:text-red-600 transition"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteTarget(componente)
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
                 <p className="text-sm text-gray-500">{meta}</p>
@@ -125,6 +172,32 @@ export function ComponentesPage() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget != null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => void handleDelete()}
+        title="Excluir componente?"
+        body={
+          deleteTarget
+            ? [
+                `"${deleteTarget.name}" será removido permanentemente${
+                  deleteVersions > 1 ? ` (todas as ${deleteVersions} versões)` : ''
+                }. Esta ação não pode ser desfeita.`,
+                deleteProductCount > 0
+                  ? `Atenção: este componente está em uso em ${deleteProductCount} ${
+                      deleteProductCount === 1 ? 'produto' : 'produtos'
+                    }. O custo histórico fica preservado, mas ele aparecerá como "Componente removido".`
+                  : '',
+              ]
+                .filter(Boolean)
+                .join('\n\n')
+            : ''
+        }
+        confirmLabel="Excluir"
+        variant="danger"
+        loading={deleting}
+      />
     </div>
   )
 }

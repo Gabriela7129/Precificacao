@@ -237,6 +237,8 @@ export const updateComponent = (
   id: string,
   data: Partial<SemiFinishedComponent>,
 ) => updateDoc<SemiFinishedComponent>(wsId, COLLECTIONS.semiFinishedComponents, id, data)
+export const deleteComponent = (wsId: string, id: string) =>
+  deleteDoc(wsId, COLLECTIONS.semiFinishedComponents, id)
 
 export const createProduct = (wsId: string, data: Omit<Product, 'workspaceId' | 'createdAt' | 'updatedAt'>) =>
   createDoc(wsId, COLLECTIONS.products, data)

@@ -8,6 +8,7 @@
 
 import {
   createComponent,
+  deleteComponent,
   updateComponent,
   useHeavyAssets,
   useLightTools,
@@ -247,4 +248,25 @@ export async function reavaliarComponente(
     version: atual.version + 1,
     isArchived: false,
   })
+}
+
+// ---------------------------------------------------------------------------
+// Exclusão: remove o componente e TODAS as suas versões (mesmo nome)
+// ---------------------------------------------------------------------------
+
+/**
+ * Exclui um componente e todas as suas versões arquivadas (documentos com o
+ * mesmo `name`). Produtos que o referenciam passam a exibir "Componente
+ * removido" (o custo fica preservado no snapshot). Retorna quantos documentos
+ * foram removidos.
+ */
+export async function excluirComponente(
+  wsId: string,
+  componente: WithId<SemiFinishedComponent>,
+  todos: WithId<SemiFinishedComponent>[],
+): Promise<number> {
+  const versoes = todos.filter((c) => c.name === componente.name)
+  const alvos = versoes.length > 0 ? versoes : [componente]
+  await Promise.all(alvos.map((v) => deleteComponent(wsId, v.id)))
+  return alvos.length
 }
