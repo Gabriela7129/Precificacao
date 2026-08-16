@@ -1,8 +1,9 @@
 /**
  * InsumoFormModal — criar/editar insumo.
  * Na criação: estoque inicial + custo médio inicial (com preview do valor
- * total em estoque). Na edição: esses campos ficam somente leitura —
- * estoque só muda por Entradas.
+ * total em estoque). Na edição: estoque e valor total podem ser corrigidos
+ * (o custo médio é recalculado como valor total ÷ estoque) — o fluxo normal
+ * de mudanças de estoque continuam sendo as Entradas.
  */
 
 import { useEffect } from 'react'
@@ -111,6 +112,9 @@ export function InsumoFormModal({
           unit: values.unit.trim(),
           categoryId: values.categoryId,
           purchaseDate: values.purchaseDate,
+          currentStock: values.initialStock,
+          averageCost,
+          totalStockValue: values.totalValue,
         })
       } else {
         await createSupply(wsId, {
@@ -238,7 +242,6 @@ export function InsumoFormModal({
               inputMode="decimal"
               min={0}
               step="any"
-              disabled={isEdit}
               error={!!errors.initialStock}
               {...register('initialStock', { valueAsNumber: true })}
             />
@@ -246,7 +249,7 @@ export function InsumoFormModal({
           </div>
           <div className="flex-1">
             <FieldLabel htmlFor="insumo-custo">
-              {isEdit ? 'Custo médio (R$)' : 'Valor total pago (R$)'}
+              {isEdit ? 'Valor total em estoque (R$)' : 'Valor total pago (R$)'}
             </FieldLabel>
             <Controller
               control={control}
@@ -256,7 +259,6 @@ export function InsumoFormModal({
                   id="insumo-custo"
                   value={field.value}
                   onChange={(value) => field.onChange(value ?? 0)}
-                  disabled={isEdit}
                   error={!!errors.totalValue}
                 />
               )}
@@ -267,21 +269,22 @@ export function InsumoFormModal({
           </div>
         </div>
         {isEdit && (
-          <FieldHint>O estoque e o custo médio só mudam por entradas de estoque.</FieldHint>
+          <FieldHint>
+            Entradas de estoque continuam sendo o fluxo normal. Corrija aqui apenas
+            lançamentos errados — o custo médio é recalculado (valor total ÷ estoque).
+          </FieldHint>
         )}
 
-        {!isEdit && (
-          <div className="bg-amber-50 rounded-xl p-3 text-sm space-y-1">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Custo médio unitário</span>
-              <span className="font-medium text-gray-900">{formatBRL(computedAverageCost)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Valor total em estoque</span>
-              <span className="font-medium text-gray-900">{formatBRL(previewTotal)}</span>
-            </div>
+        <div className="bg-amber-50 rounded-xl p-3 text-sm space-y-1">
+          <div className="flex justify-between">
+            <span className="text-gray-600">Custo médio unitário</span>
+            <span className="font-medium text-gray-900">{formatBRL(computedAverageCost)}</span>
           </div>
-        )}
+          <div className="flex justify-between">
+            <span className="text-gray-600">Valor total em estoque</span>
+            <span className="font-medium text-gray-900">{formatBRL(previewTotal)}</span>
+          </div>
+        </div>
       </form>
     </Modal>
   )
