@@ -266,7 +266,7 @@ export function InsumosPage() {
         <>
           <div className="flex gap-3 mb-4">
             <SearchInput
-              className="flex-1 max-w-none"
+              className="flex-1 min-w-0 max-w-none"
               value={search}
               onChange={setSearch}
               placeholder="Buscar insumo..."
@@ -275,7 +275,7 @@ export function InsumosPage() {
               surface="white"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-auto"
+              className="flex-1 min-w-0 max-w-none"
               aria-label="Filtrar por categoria"
             >
               <option value="">Todas as categorias</option>

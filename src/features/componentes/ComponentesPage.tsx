@@ -4,7 +4,7 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Copy, Pencil, Trash2, Wrench } from 'lucide-react'
+import { Copy, Package, Pencil, Trash2, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge, Button, CardsSkeleton, ConfirmDialog, EmptyState, PageHeader } from '../../components/ui'
 import { Card } from '../../components/ui'
@@ -12,11 +12,14 @@ import { useActiveWorkspaceId, useProducts, useSemiFinishedComponents } from '..
 import { formatBRL, formatMinutes } from '../../lib/format'
 import { duplicarComponente, excluirComponente } from './data'
 
+type ListaView = 'produtos' | 'embalagens'
+
 export function ComponentesPage() {
   const navigate = useNavigate()
   const wsId = useActiveWorkspaceId()
   const { data, loading } = useSemiFinishedComponents()
   const { data: products } = useProducts()
+  const [view, setView] = useState<ListaView>('produtos')
   const [duplicandoId, setDuplicandoId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<(typeof data)[number] | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -67,27 +70,50 @@ export function ComponentesPage() {
     : 0
 
   const ativos = data
-    .filter((c) => !c.isArchived && !c.isPackaging)
+    .filter((c) =>
+      !c.isArchived && (view === 'embalagens' ? c.isPackaging === true : !c.isPackaging),
+    )
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+
+  const rotaNovo = view === 'embalagens' ? '/componentes/novo?tipo=embalagem' : '/componentes/novo'
+  const labelNovo = view === 'embalagens' ? '+ Nova embalagem' : '+ Novo componente'
+
+  const tabClass = (active: boolean) =>
+    `px-4 py-2 rounded-xl text-sm font-medium transition ${
+      active
+        ? 'bg-rose-500 text-white shadow-sm'
+        : 'bg-white text-gray-600 border border-rose-200 hover:bg-rose-50'
+    }`
 
   return (
     <div>
       <PageHeader
         title="Componentes Semi-Acabados"
-        actions={
-          <Button onClick={() => navigate('/componentes/novo')}>+ Novo componente</Button>
-        }
+        actions={<Button onClick={() => navigate(rotaNovo)}>{labelNovo}</Button>}
       />
+
+      <div className="flex gap-2 mb-6">
+        <button type="button" onClick={() => setView('produtos')} className={tabClass(view === 'produtos')}>
+          Produto
+        </button>
+        <button type="button" onClick={() => setView('embalagens')} className={tabClass(view === 'embalagens')}>
+          Embalagem
+        </button>
+      </div>
 
       {loading ? (
         <CardsSkeleton />
       ) : ativos.length === 0 ? (
         <EmptyState
-          icon={Wrench}
-          title="Nenhum componente cadastrado"
-          description="Crie itens intermediários como 'Miolo A5 Costurado' para reutilizar nos produtos."
-          actionLabel="+ Novo componente"
-          onAction={() => navigate('/componentes/novo')}
+          icon={view === 'embalagens' ? Package : Wrench}
+          title={view === 'embalagens' ? 'Nenhuma embalagem cadastrada' : 'Nenhum componente cadastrado'}
+          description={
+            view === 'embalagens'
+              ? 'Crie embalagens como componentes para usar na seção de embalagens dos produtos.'
+              : "Crie itens intermediários como 'Miolo A5 Costurado' para reutilizar nos produtos."
+          }
+          actionLabel={labelNovo}
+          onAction={() => navigate(rotaNovo)}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -84,9 +84,11 @@ type ComponentFormValues = z.infer<typeof componentFormSchema>
 
 export interface ComponenteFormPageProps {
   componente?: WithId<SemiFinishedComponent>
+  /** Criação a partir da aba "Embalagem": checkbox já marcado. */
+  isPackagingInicial?: boolean
 }
 
-export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
+export function ComponenteFormPage({ componente, isPackagingInicial = false }: ComponenteFormPageProps) {
   const isEdit = componente != null
   const readOnly = componente?.isArchived ?? false
 
@@ -127,7 +129,7 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
         }
       : {
           name: '',
-          isPackaging: false,
+          isPackaging: isPackagingInicial,
           supplies: [],
           machineAssets: [],
           lightTools: [],
@@ -223,7 +225,7 @@ export function ComponenteFormPage({ componente }: ComponenteFormPageProps) {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <h1 className="text-2xl font-bold text-gray-900">
-          {isEdit ? componente.name : 'Novo componente'}
+          {isEdit ? componente.name : isPackagingInicial ? 'Nova embalagem' : 'Novo componente'}
         </h1>
         {isEdit && <Badge variant="rose">v{componente.version}</Badge>}
       </div>
