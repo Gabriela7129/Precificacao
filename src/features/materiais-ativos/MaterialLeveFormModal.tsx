@@ -1,5 +1,5 @@
 /**
- * Modal de cadastro/edição de Material Leve (itens até R$ 500,00).
+ * Modal de cadastro/edição de Material Leve.
  * A manutenção mensal é calculada no momento do cadastro/edição
  * (purchaseValue × taxa/100 das settings) e persistida no documento.
  */
@@ -122,7 +122,7 @@ export function MaterialLeveFormModal({
           {errors.purchaseValue ? (
             <FieldError>{errors.purchaseValue.message}</FieldError>
           ) : (
-            <FieldHint>Itens até R$ 500,00. Acima disso, cadastre em Ativos Pesados.</FieldHint>
+            <FieldHint>A manutenção mensal é calculada pela taxa das Configurações.</FieldHint>
           )}
         </div>
 

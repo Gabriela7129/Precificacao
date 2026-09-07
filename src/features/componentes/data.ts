@@ -75,8 +75,8 @@ export interface ComposicaoCustoInput {
   supplies: { supplyId: string; quantity: number }[]
   /** Lista de ativos pesados + tempo em minutos. */
   machineAssets: { assetId: string; timeMinutes: number }[]
-  /** Lista de materiais leves + tempo em minutos. */
-  lightTools: { toolId: string; timeMinutes: number }[]
+  /** Lista de materiais leves (custo fixo = manutenção mensal do item). */
+  lightTools: { toolId: string }[]
   humanProfile: HumanProfile
   humanTimeMinutes: number
 }
@@ -135,14 +135,15 @@ export function calcularCustoComposicao(
       }
     })
 
-  // Materiais leves: tempo em minutos → horas + snapshot rateio/hora.
+  // Materiais leves: custo FIXO por item = manutenção mensal (valor pago × taxa %).
+  // `timeMinutes` é salvo como 0 (legado); o custo não depende de tempo.
   const lightToolLines: ComponentLightToolLine[] = input.lightTools
     .filter((l) => l.toolId !== '')
     .map((l) => {
       const tool = lightTools.find((t) => t.id === l.toolId)
       return {
         toolId: l.toolId,
-        timeMinutes: l.timeMinutes,
+        timeMinutes: 0,
         costPerHourSnapshot: tool?.monthlyMaintenanceCost ?? 0,
       }
     })
@@ -152,10 +153,7 @@ export function calcularCustoComposicao(
     (sum, l) => sum + (l.timeMinutes / 60) * l.costPerHourSnapshot,
     0,
   )
-  const lightToolCost = lightToolLines.reduce(
-    (sum, l) => sum + (l.timeMinutes / 60) * l.costPerHourSnapshot,
-    0,
-  )
+  const lightToolCost = lightToolLines.reduce((sum, l) => sum + l.costPerHourSnapshot, 0)
   const humanCost = humanTimeHours * humanHourlyRate
 
   const unitCost = componentUnitCost({
@@ -167,8 +165,7 @@ export function calcularCustoComposicao(
     })),
     lightTools: lightToolLines.map((l) => ({
       toolId: l.toolId,
-      timeHours: l.timeMinutes / 60,
-      costPerHour: l.costPerHourSnapshot,
+      cost: l.costPerHourSnapshot,
     })),
     humanTimeHours,
     humanHourlyRate,
@@ -225,7 +222,7 @@ export async function reavaliarComponente(
     {
       supplies: (atual.supplies ?? []).map((l) => ({ supplyId: l.supplyId, quantity: l.quantity })),
       machineAssets: (atual.machineAssets ?? []).map((l) => ({ assetId: l.assetId, timeMinutes: l.timeMinutes })),
-      lightTools: (atual.lightTools ?? []).map((l) => ({ toolId: l.toolId, timeMinutes: l.timeMinutes })),
+      lightTools: (atual.lightTools ?? []).map((l) => ({ toolId: l.toolId })),
       humanProfile: atual.humanProfile,
       humanTimeMinutes: atual.humanTimeHours * 60,
     },

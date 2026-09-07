@@ -23,9 +23,6 @@ export const CREATIVE_HOUR_FACTOR = 1.4
 /** Taxa padrão de manutenção de materiais leves (%). */
 export const DEFAULT_LIGHT_MAINTENANCE_RATE = 7
 
-/** Limite de valor entre material leve e ativo pesado (R$). */
-export const LIGHT_TOOL_MAX_VALUE = 500
-
 // ---------------------------------------------------------------------------
 // Calculadora de valor hora (Módulo 1)
 // ---------------------------------------------------------------------------
@@ -144,8 +141,8 @@ export interface ComponentCostInput {
   supplies: ComponentSupplyLine[]
   /** Linhas de máquina pesada com tempo em horas. */
   machineAssets: { assetId: string; timeHours: number; costPerHour: number }[]
-  /** Linhas de materiais leves com tempo em horas. */
-  lightTools: { toolId: string; timeHours: number; costPerHour: number }[]
+  /** Linhas de material leve com custo fixo (manutenção mensal do item). */
+  lightTools: { toolId: string; cost: number }[]
   /** Tempo de mão de obra em horas. */
   humanTimeHours: number
   /** Valor hora do perfil selecionado (operacional ou criativo). */
@@ -155,7 +152,7 @@ export interface ComponentCostInput {
 /**
  * custo unitário = Σ(insumo × quantidade × custo médio)
  *                + Σ(tempo máquina × custo/hora do ativo)
- *                + Σ(tempo material leve × rateio/hora)
+ *                + Σ(custo fixo de cada material leve)  ← taxa de manutenção mensal, sem tempo
  *                + (tempo humano × valor hora)
  */
 export function componentUnitCost(input: ComponentCostInput): number {
@@ -167,10 +164,7 @@ export function componentUnitCost(input: ComponentCostInput): number {
     (sum, line) => sum + line.timeHours * line.costPerHour,
     0,
   )
-  const lightToolCost = input.lightTools.reduce(
-    (sum, line) => sum + line.timeHours * line.costPerHour,
-    0,
-  )
+  const lightToolCost = input.lightTools.reduce((sum, line) => sum + line.cost, 0)
   const humanCost = input.humanTimeHours * input.humanHourlyRate
   return suppliesCost + machineCost + lightToolCost + humanCost
 }

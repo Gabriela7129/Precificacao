@@ -156,7 +156,7 @@ export function AtivoPesadoFormModal({
           {errors.purchaseValue ? (
             <FieldError>{errors.purchaseValue.message}</FieldError>
           ) : (
-            <FieldHint>Itens acima de R$ 500,00. Até R$ 500,00, cadastre em Materiais Leves.</FieldHint>
+            <FieldHint>Sem limite de valor — o que define a categoria é onde o item é cadastrado.</FieldHint>
           )}
         </div>
 

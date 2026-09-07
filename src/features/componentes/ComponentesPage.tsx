@@ -124,12 +124,9 @@ export function ComponentesPage() {
               (sum, l) => sum + (l.timeMinutes || 0),
               0,
             )
-            const totalLightMinutes = lightTools.reduce(
-              (sum, l) => sum + (l.timeMinutes || 0),
-              0,
-            )
             const totalHumanMinutes = Math.round(componente.humanTimeHours * 60)
-            const totalMinutos = totalMachineMinutes + totalLightMinutes + totalHumanMinutes
+            // Materiais leves têm custo fixo (sem tempo) — não entram no total de minutos.
+            const totalMinutos = totalMachineMinutes + totalHumanMinutes
             const meta = [
               `${componente.supplies.length} ${componente.supplies.length === 1 ? 'insumo' : 'insumos'}`,
               `${machineAssets.length} ${machineAssets.length === 1 ? 'ativo' : 'ativos'}`,

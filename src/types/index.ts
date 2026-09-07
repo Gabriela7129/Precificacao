@@ -156,8 +156,9 @@ export interface ComponentMachineLine {
 
 export interface ComponentLightToolLine {
   toolId: string
+  /** Legado (componentes antigos): minutos de uso. Novos salvam 0 — o custo é fixo. */
   timeMinutes: number
-  /** Snapshot do custo/hora de mão de obra + material leve na data da composição. */
+  /** Custo fixo do item na composição = manutenção mensal (valor pago × taxa %). */
   costPerHourSnapshot: number
 }
 

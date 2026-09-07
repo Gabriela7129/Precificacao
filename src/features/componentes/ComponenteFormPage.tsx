@@ -59,9 +59,6 @@ const machineLineSchema = z.object({
 
 const lightToolLineSchema = z.object({
   toolId: z.string().min(1, 'Selecione um material leve'),
-  timeMinutes: z.coerce
-    .number({ invalid_type_error: 'Obrigatório' })
-    .min(0, 'Não pode ser negativo'),
 })
 
 const componentFormSchema = z.object({
@@ -122,7 +119,6 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
           })),
           lightTools: (componente.lightTools ?? []).map((l) => ({
             toolId: l.toolId,
-            timeMinutes: l.timeMinutes,
           })),
           humanProfile: componente.humanProfile,
           humanTimeMinutes: Math.round(componente.humanTimeHours * 60),
@@ -156,7 +152,6 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
       })),
       lightTools: (values.lightTools ?? []).map((l) => ({
         toolId: l?.toolId ?? '',
-        timeMinutes: Number(l?.timeMinutes) || 0,
       })),
       humanProfile: values.humanProfile ?? 'operational',
       humanTimeMinutes: Number(values.humanTimeMinutes) || 0,
@@ -428,11 +423,14 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
 
             <Card>
               <h2 className="font-semibold text-gray-900 mb-4">Materiais leves</h2>
+              <p className="text-xs text-gray-500 mb-3">
+                Cada material entra com custo fixo = manutenção mensal (valor pago × taxa %).
+              </p>
               <div className="space-y-3">
                 {lightToolFields.map((field, index) => {
                   const line = values.lightTools?.[index]
                   const tool = lightTools.find((t) => t.id === line?.toolId)
-                  const subtotal = tool ? ((line?.timeMinutes || 0) / 60) * tool.monthlyMaintenanceCost : 0
+                  const subtotal = tool?.monthlyMaintenanceCost ?? 0
                   return (
                     <div key={field.id}>
                       <div className="flex gap-3 items-start">
@@ -446,27 +444,13 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                                   .filter((t) => !values.lightTools?.some((existing, i) => existing.toolId === t.id && i !== index))
                                   .map((t) => ({
                                     value: t.id,
-                                    label: `${t.name} (${formatBRL(t.monthlyMaintenanceCost)}/h)`,
+                                    label: `${t.name} (${formatBRL(t.monthlyMaintenanceCost)})`,
                                   }))}
                                 value={value}
                                 onChange={onChange}
                                 placeholder="Selecione um material leve"
                               />
                             )}
-                          />
-                        </div>
-                        <div className="w-24 flex-shrink-0">
-                          <FieldLabel htmlFor={`light-min-${index}`} className="sr-only">
-                            Min.
-                          </FieldLabel>
-                          <Input
-                            id={`light-min-${index}`}
-                            type="number"
-                            min="0"
-                            step="1"
-                            placeholder="Min."
-                            error={!!errors.lightTools?.[index]?.timeMinutes}
-                            {...register(`lightTools.${index}.timeMinutes`)}
                           />
                         </div>
                         <span className="text-sm text-gray-600 w-20 text-right pt-2">
@@ -481,10 +465,9 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
-                      {(errors.lightTools?.[index]?.toolId || errors.lightTools?.[index]?.timeMinutes) && (
+                      {errors.lightTools?.[index]?.toolId && (
                         <FieldError>
-                          {errors.lightTools[index]?.toolId?.message ??
-                            errors.lightTools[index]?.timeMinutes?.message}
+                          {errors.lightTools[index]?.toolId?.message}
                         </FieldError>
                       )}
                     </div>
@@ -498,7 +481,7 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                 <Button
                   variant="ghost"
                   type="button"
-                  onClick={() => appendLightTool({ toolId: '', timeMinutes: 0 })}
+                  onClick={() => appendLightTool({ toolId: '' })}
                 >
                   + Adicionar material leve
                 </Button>
