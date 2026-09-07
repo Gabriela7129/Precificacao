@@ -8,7 +8,7 @@
  */
 
 import { useMemo } from 'react'
-import { useProducts, useSettings } from '../../services/firestore'
+import { createProduct, deleteProduct, useProducts, useSettings } from '../../services/firestore'
 import type { HumanProfile, Product, WithId, WorkspaceSettings } from '../../types'
 
 /** Settings do workspace como doc único (o contrato retorna uma coleção). */
@@ -50,4 +50,48 @@ export function useProductVersions(product: WithId<Product> | null): WithId<Prod
       .filter((p) => p.name === product.name)
       .sort((a, b) => b.version - a.version)
   }, [data, product])
+}
+
+// ---------------------------------------------------------------------------
+// Duplicação e exclusão
+// ---------------------------------------------------------------------------
+
+/**
+ * Cria uma cópia do produto como NOVO documento: mesma composição,
+ * snapshots, margem, marketplace e preço de venda, nome com sufixo "(cópia)",
+ * `version: 1` e histórico independente. Retorna o id da cópia.
+ */
+export async function duplicarProduto(
+  wsId: string,
+  origem: WithId<Product>,
+): Promise<string> {
+  return createProduct(wsId, {
+    name: `${origem.name} (cópia)`,
+    components: (origem.components ?? []).map((l) => ({ ...l })),
+    packaging: (origem.packaging ?? []).map((l) => ({ ...l })),
+    finalHumanTimeHours: origem.finalHumanTimeHours,
+    finalHumanProfile: origem.finalHumanProfile,
+    directCost: origem.directCost,
+    profitMargin: origem.profitMargin,
+    marketplaceId: origem.marketplaceId,
+    desiredNetValue: origem.desiredNetValue,
+    salePrice: origem.salePrice,
+    version: 1,
+    isArchived: false,
+  })
+}
+
+/**
+ * Exclui um produto e todas as suas versões (documentos com o mesmo `name`),
+ * inclusive arquivadas. Retorna quantos documentos foram removidos.
+ */
+export async function excluirProduto(
+  wsId: string,
+  produto: WithId<Product>,
+  todos: WithId<Product>[],
+): Promise<number> {
+  const versoes = todos.filter((p) => p.name === produto.name)
+  const alvos = versoes.length > 0 ? versoes : [produto]
+  await Promise.all(alvos.map((v) => deleteProduct(wsId, v.id)))
+  return alvos.length
 }

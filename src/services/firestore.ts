@@ -244,6 +244,8 @@ export const createProduct = (wsId: string, data: Omit<Product, 'workspaceId' | 
   createDoc(wsId, COLLECTIONS.products, data)
 export const updateProduct = (wsId: string, id: string, data: Partial<Product>) =>
   updateDoc<Product>(wsId, COLLECTIONS.products, id, data)
+export const deleteProduct = (wsId: string, id: string) =>
+  deleteDoc(wsId, COLLECTIONS.products, id)
 
 export const upsertSettings = (wsId: string, docId: string, data: Partial<WorkspaceSettings>) =>
   updateDoc<WorkspaceSettings>(wsId, COLLECTIONS.settings, docId, data)

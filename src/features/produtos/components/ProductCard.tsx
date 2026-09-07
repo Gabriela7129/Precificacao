@@ -1,3 +1,4 @@
+import { Copy, Trash2 } from 'lucide-react'
 import { Badge } from '../../../components/ui/Badge'
 import { Card } from '../../../components/ui/Card'
 import { priceWithoutFees } from '../../../lib/calculations'
@@ -10,13 +11,26 @@ export interface ProductCardProps {
   marketplaceName?: string | null
   archived?: boolean
   onClick: () => void
+  /** Duplicar produto (ausente = sem botão). */
+  onDuplicate?: () => void
+  duplicating?: boolean
+  /** Excluir produto (ausente = sem botão). */
+  onDelete?: () => void
 }
 
 /**
  * Card canônico de produto (design.md 5.10/5.11): título + meta + badge,
  * linhas Custo direto / Margem / Preço sem taxas e destaque Preço de venda.
  */
-export function ProductCard({ product, marketplaceName, archived = false, onClick }: ProductCardProps) {
+export function ProductCard({
+  product,
+  marketplaceName,
+  archived = false,
+  onClick,
+  onDuplicate,
+  duplicating = false,
+  onDelete,
+}: ProductCardProps) {
   const precoSemTaxas = priceWithoutFees(product.directCost, product.profitMargin)
   const asTimestamp = (value: unknown) => value as { toDate: () => Date } | undefined
   const meta = archived
@@ -30,7 +44,38 @@ export function ProductCard({ product, marketplaceName, archived = false, onClic
           <h3 className="font-semibold text-lg text-gray-900 truncate">{product.name}</h3>
           <p className="text-sm text-gray-500">{meta}</p>
         </div>
-        <Badge variant={archived ? 'muted' : 'success'}>{archived ? 'Arquivado' : 'Ativo'}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={archived ? 'muted' : 'success'}>{archived ? 'Arquivado' : 'Ativo'}</Badge>
+          {onDuplicate && (
+            <button
+              type="button"
+              aria-label="Duplicar produto"
+              title="Duplicar produto"
+              disabled={duplicating}
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-rose-100 hover:text-rose-600 transition disabled:opacity-50"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDuplicate()
+              }}
+            >
+              <Copy className="w-4 h-4" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              aria-label="Excluir produto"
+              title="Excluir produto"
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-rose-100 hover:text-red-600 transition"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete()
+              }}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
