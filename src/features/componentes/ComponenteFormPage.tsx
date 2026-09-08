@@ -95,6 +95,23 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
 
   const [confirmReavaliar, setConfirmReavaliar] = useState(false)
   const [reavaliando, setReavaliando] = useState(false)
+  const [confirmArquivar, setConfirmArquivar] = useState(false)
+  const [arquivando, setArquivando] = useState(false)
+
+  const handleArquivar = async () => {
+    if (!wsId || !componente) return
+    setArquivando(true)
+    try {
+      await updateComponent(wsId, componente.id, { isArchived: true })
+      toast.success('Componente arquivado')
+      setConfirmArquivar(false)
+      navigate('/componentes')
+    } catch {
+      toast.error('Não foi possível arquivar. Tente novamente.')
+    } finally {
+      setArquivando(false)
+    }
+  }
 
   const {
     register,
@@ -575,6 +592,16 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                     Reavaliar custos
                   </Button>
                 )}
+                {isEdit && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => setConfirmArquivar(true)}
+                  >
+                    Arquivar versão
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="secondary"
@@ -599,6 +626,19 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
           confirmLabel="Reavaliar"
           variant="primary"
           loading={reavaliando}
+        />
+      )}
+
+      {isEdit && (
+        <ConfirmDialog
+          open={confirmArquivar}
+          onClose={() => setConfirmArquivar(false)}
+          onConfirm={() => void handleArquivar()}
+          title="Arquivar este componente?"
+          body={`A versão atual (v${componente.version}) ficará somente leitura e aparecerá na página de Componentes Arquivados.`}
+          confirmLabel="Arquivar"
+          variant="danger"
+          loading={arquivando}
         />
       )}
     </div>
