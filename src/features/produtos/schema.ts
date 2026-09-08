@@ -36,6 +36,25 @@ export const productFormSchema = z.object({
       unitCostSnapshot: z.number().nullable(),
     }),
   ),
+  /** Ativos pesados usados diretamente no produto (tempo em minutos na UI). */
+  machineAssets: z.array(
+    z.object({
+      assetId: z.string().min(1, 'Selecione um ativo'),
+      timeMinutes: z
+        .number({ invalid_type_error: 'Obrigatório' })
+        .min(0, 'Não pode ser negativo'),
+      /** Snapshot salvo do custo/hora no momento da montagem. */
+      costPerHourSnapshot: z.number().nullable(),
+    }),
+  ),
+  /** Materiais leves usados diretamente no produto (custo fixo; entram na regra 1×). */
+  lightTools: z.array(
+    z.object({
+      toolId: z.string().min(1, 'Selecione um material leve'),
+      /** Snapshot salvo do custo fixo no momento da montagem. */
+      costSnapshot: z.number().nullable(),
+    }),
+  ),
   /** Tempo de acabamento final, em MINUTOS na UI. */
   finalHumanTimeMinutes: z
     .number({ invalid_type_error: 'Obrigatório' })

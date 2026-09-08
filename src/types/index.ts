@@ -199,6 +199,21 @@ export interface ProductSupplyLine {
   unitCostSnapshot: number
 }
 
+/** Ativo pesado usado diretamente no produto (tempo de uso × custo/hora). */
+export interface ProductMachineLine {
+  assetId: string
+  timeMinutes: number
+  /** Snapshot do custo/hora (R$/h) do ativo na data da montagem. */
+  costPerHourSnapshot: number
+}
+
+/** Material leve usado diretamente no produto (custo fixo = manutenção mensal). Entra na regra de contagem 1×. */
+export interface ProductLightToolLine {
+  toolId: string
+  /** Snapshot do custo fixo (manutenção mensal) na data da montagem. */
+  costSnapshot: number
+}
+
 export interface ProductPackagingLine {
   /** Em produtos antigos era supplyId; novos usam componentId. Mantemos ambos opcionais para compatibilidade. */
   supplyId?: string
@@ -215,6 +230,10 @@ export interface Product {
   packaging: ProductPackagingLine[]
   /** Insumos extras diretos no produto (opcional — produtos antigos não têm). */
   supplies?: ProductSupplyLine[]
+  /** Ativos pesados diretos no produto (tempo de uso × custo/hora). */
+  machineAssets?: ProductMachineLine[]
+  /** Materiais leves diretos no produto (custo fixo; entram na dedução de repetição). */
+  lightTools?: ProductLightToolLine[]
   finalHumanTimeHours: number
   finalHumanProfile: HumanProfile
   directCost: number

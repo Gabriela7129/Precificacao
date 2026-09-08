@@ -14,6 +14,7 @@ import type {
   LightTool,
   Product,
   ProductComponentLine,
+  ProductLightToolLine,
   ProductPackagingLine,
   SemiFinishedComponent,
   WithId,
@@ -85,17 +86,20 @@ export interface SharedLightToolsResult {
 }
 
 /**
- * Analisa os materiais leves usados pelos componentes e embalagens do
- * produto. Cada material é contabilizado UMA única vez no produto, mesmo
- * aparecendo em vários componentes (ou em quantidade > 1): a dedução remove
- * as repetições do custo direto. O custo mantido é o snapshot da primeira
- * aparição; a dedução é a soma de todos os custos embutidos menos esse valor.
+ * Analisa os materiais leves usados pelos componentes, embalagens e linhas
+ * diretas do produto. Cada material é contabilizado UMA única vez no produto,
+ * mesmo aparecendo em vários componentes (ou em quantidade > 1, ou também
+ * como material leve direto): a dedução remove as repetições do custo direto.
+ * O custo mantido é o snapshot da primeira aparição; a dedução é a soma de
+ * todos os custos embutidos menos esse valor.
  */
 export function analisarLevesCompartilhados(
   componentLines: Pick<ProductComponentLine, 'componentId' | 'quantity'>[],
   packagingLines: Pick<ProductPackagingLine, 'componentId' | 'quantity'>[],
   componentsById: Map<string, WithId<SemiFinishedComponent>>,
   lightToolsById: Map<string, WithId<LightTool>>,
+  /** Materiais leves adicionados diretamente ao produto (custo fixo, 1 aparição cada). */
+  directLightToolLines: Pick<ProductLightToolLine, 'toolId' | 'costSnapshot'>[] = [],
 ): SharedLightToolsResult {
   // toolId → { occurrences, firstUnitCost, totalCost } somando todas as linhas.
   const acc = new Map<
@@ -103,29 +107,34 @@ export function analisarLevesCompartilhados(
     { occurrences: number; firstUnitCost: number; totalCost: number }
   >()
 
+  const addCost = (toolId: string, quantity: number, cost: number) => {
+    if (!toolId) return
+    const qty = Number.isFinite(quantity) && quantity > 0 ? quantity : 1
+    const current = acc.get(toolId)
+    if (current) {
+      current.occurrences += qty
+      current.totalCost += qty * cost
+    } else {
+      acc.set(toolId, {
+        occurrences: qty,
+        firstUnitCost: cost,
+        totalCost: qty * cost,
+      })
+    }
+  }
+
   const addLine = (componentId: string | undefined, quantity: number) => {
     if (!componentId) return
     const componente = componentsById.get(componentId)
     for (const line of componente?.lightTools ?? []) {
       if (!line.toolId) continue
-      const qty = Number.isFinite(quantity) && quantity > 0 ? quantity : 1
-      const cost = line.costPerHourSnapshot ?? 0
-      const current = acc.get(line.toolId)
-      if (current) {
-        current.occurrences += qty
-        current.totalCost += qty * cost
-      } else {
-        acc.set(line.toolId, {
-          occurrences: qty,
-          firstUnitCost: cost,
-          totalCost: qty * cost,
-        })
-      }
+      addCost(line.toolId, quantity, line.costPerHourSnapshot ?? 0)
     }
   }
 
   for (const l of componentLines) addLine(l.componentId, l.quantity)
   for (const l of packagingLines) addLine(l.componentId ?? undefined, l.quantity)
+  for (const l of directLightToolLines) addCost(l.toolId, 1, l.costSnapshot ?? 0)
 
   const infos: SharedLightToolInfo[] = []
   let deduction = 0
@@ -163,6 +172,8 @@ export async function duplicarProduto(
     supplies: (origem.supplies ?? []).map((l) => ({ ...l })),
     components: (origem.components ?? []).map((l) => ({ ...l })),
     packaging: (origem.packaging ?? []).map((l) => ({ ...l })),
+    machineAssets: (origem.machineAssets ?? []).map((l) => ({ ...l })),
+    lightTools: (origem.lightTools ?? []).map((l) => ({ ...l })),
     finalHumanTimeHours: origem.finalHumanTimeHours,
     finalHumanProfile: origem.finalHumanProfile,
     directCost: origem.directCost,

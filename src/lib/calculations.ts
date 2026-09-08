@@ -5,7 +5,7 @@
  * viver em componentes de UI.
  */
 
-import type { ComponentSupplyLine, ProductComponentLine, ProductPackagingLine, ProductSupplyLine } from '../types'
+import type { ComponentSupplyLine, ProductComponentLine, ProductLightToolLine, ProductMachineLine, ProductPackagingLine, ProductSupplyLine } from '../types'
 
 // ---------------------------------------------------------------------------
 // Constantes de negócio
@@ -178,6 +178,10 @@ export interface DirectCostInput {
   packaging: ProductPackagingLine[]
   /** Insumos extras adicionados diretamente ao produto. */
   supplies?: ProductSupplyLine[]
+  /** Ativos pesados adicionados diretamente ao produto (tempo × custo/hora). */
+  machineAssets?: ProductMachineLine[]
+  /** Materiais leves adicionados diretamente ao produto (custo fixo; entram na dedução de repetição). */
+  lightTools?: ProductLightToolLine[]
   finalHumanTimeHours: number
   finalHumanHourlyRate: number
   /** Dedução dos materiais leves compartilhados entre componentes (contados 1× no produto). */
@@ -188,8 +192,10 @@ export interface DirectCostInput {
  * custo direto = Σ(componentes × quantidade × custo unitário)
  *              + Σ(embalagens × quantidade × custo)
  *              + Σ(insumos extras × quantidade × custo médio)
+ *              + Σ(ativos pesados diretos × minutos/60 × custo/hora)
+ *              + Σ(materiais leves diretos × custo fixo)
  *              + (tempo humano final × valor hora)
- *              − dedução de materiais leves compartilhados
+ *              − dedução de materiais leves compartilhados (contados 1×)
  */
 export function productDirectCost(input: DirectCostInput): number {
   const componentsCost = input.components.reduce(
@@ -204,8 +210,24 @@ export function productDirectCost(input: DirectCostInput): number {
     (sum, line) => sum + line.quantity * line.unitCostSnapshot,
     0,
   )
+  const machineCost = (input.machineAssets ?? []).reduce(
+    (sum, line) => sum + (line.timeMinutes / 60) * line.costPerHourSnapshot,
+    0,
+  )
+  const directLightToolsCost = (input.lightTools ?? []).reduce(
+    (sum, line) => sum + line.costSnapshot,
+    0,
+  )
   const humanCost = input.finalHumanTimeHours * input.finalHumanHourlyRate
-  return componentsCost + packagingCost + suppliesCost + humanCost - (input.lightToolDeduction ?? 0)
+  return (
+    componentsCost +
+    packagingCost +
+    suppliesCost +
+    machineCost +
+    directLightToolsCost +
+    humanCost -
+    (input.lightToolDeduction ?? 0)
+  )
 }
 
 /** preço sem taxas = custo direto × (1 + margem de lucro / 100) */

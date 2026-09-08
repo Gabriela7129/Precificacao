@@ -24,8 +24,9 @@ import {
   useMarketplaces,
   useSemiFinishedComponents,
   useSupplies,
+  useHeavyAssets,
 } from '../../services/firestore'
-import type { HumanProfile, ProductComponentLine, ProductPackagingLine, ProductSupplyLine } from '../../types'
+import type { HumanProfile, ProductComponentLine, ProductLightToolLine, ProductMachineLine, ProductPackagingLine, ProductSupplyLine } from '../../types'
 import { analisarLevesCompartilhados, hourlyRateForProfile, useProduct, useSettingsDoc } from './data'
 import { computePricing } from './pricing'
 import { productFormSchema, type ProductFormValues } from './schema'
@@ -41,6 +42,8 @@ const emptyDefaults: ProductFormValues = {
   supplies: [],
   components: [],
   packaging: [],
+  machineAssets: [],
+  lightTools: [],
   // snapshots are populated on edit; create leaves them null
   finalHumanTimeMinutes: 0,
   finalHumanProfile: 'operational',
@@ -65,6 +68,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
   const { data: marketplaces, loading: loadingMarketplaces } = useMarketplaces()
   const { data: lightTools } = useLightTools()
   const { data: supplies, loading: loadingSupplies } = useSupplies()
+  const { data: heavyAssets } = useHeavyAssets()
 
   const [saving, setSaving] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
@@ -72,7 +76,9 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
   const activeComponents = useMemo(() => components.filter((c) => !c.isArchived && !c.isPackaging), [components])
   const packagingComponents = useMemo(() => components.filter((c) => !c.isArchived && c.isPackaging), [components])
   const componentsById = useMemo(() => new Map(components.map((c) => [c.id, c])), [components])
+  const activeLightTools = useMemo(() => lightTools.filter((t) => t.isActive), [lightTools])
   const lightToolsById = useMemo(() => new Map(lightTools.map((t) => [t.id, t])), [lightTools])
+  const heavyAssetsById = useMemo(() => new Map(heavyAssets.map((a) => [a.id, a])), [heavyAssets])
   const activeSupplies = useMemo(() => supplies.filter((s) => s.isActive), [supplies])
   const suppliesById = useMemo(() => new Map(supplies.map((s) => [s.id, s])), [supplies])
 
@@ -93,6 +99,8 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
   const supplyFields = useFieldArray({ control, name: 'supplies' })
   const componentFields = useFieldArray({ control, name: 'components' })
   const packagingFields = useFieldArray({ control, name: 'packaging' })
+  const machineFields = useFieldArray({ control, name: 'machineAssets' })
+  const lightToolFields = useFieldArray({ control, name: 'lightTools' })
 
   // Pré-seleciona o marketplace padrão na criação.
   useEffect(() => {
@@ -112,6 +120,8 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
       supplies: (product.supplies ?? []).map((l) => ({ supplyId: l.supplyId, quantity: l.quantity, unitCostSnapshot: l.unitCostSnapshot })),
       components: product.components.map((l) => ({ componentId: l.componentId, quantity: l.quantity, unitCostSnapshot: l.unitCostSnapshot })),
       packaging: product.packaging.map((l) => ({ componentId: l.componentId ?? l.supplyId, quantity: l.quantity, unitCostSnapshot: l.unitCostSnapshot })),
+      machineAssets: (product.machineAssets ?? []).map((l) => ({ assetId: l.assetId, timeMinutes: l.timeMinutes, costPerHourSnapshot: l.costPerHourSnapshot })),
+      lightTools: (product.lightTools ?? []).map((l) => ({ toolId: l.toolId, costSnapshot: l.costSnapshot })),
       finalHumanTimeMinutes: Math.round(product.finalHumanTimeHours * 60),
       finalHumanProfile: product.finalHumanProfile,
       profitMargin: product.profitMargin,
@@ -153,20 +163,37 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
         quantity: l.quantity,
         unitCostSnapshot: componentsById.get(l.componentId)?.unitCost ?? 0,
       }))
+    const machineLines: ProductMachineLine[] = (values.machineAssets ?? [])
+      .filter((l) => l.assetId && Number.isFinite(l.timeMinutes))
+      .map((l) => ({
+        assetId: l.assetId,
+        timeMinutes: l.timeMinutes,
+        costPerHourSnapshot: heavyAssetsById.get(l.assetId)?.totalCostPerHour ?? 0,
+      }))
+    const directLightToolLines: ProductLightToolLine[] = (values.lightTools ?? [])
+      .filter((l) => l.toolId)
+      .map((l) => ({
+        toolId: l.toolId,
+        costSnapshot: lightToolsById.get(l.toolId)?.monthlyMaintenanceCost ?? 0,
+      }))
     const profile = values.finalHumanProfile ?? 'operational'
     const hourlyRate = hourlyRateForProfile(settings, profile)
     const finalHumanTimeHours = (values.finalHumanTimeMinutes ?? 0) / 60
     // Materiais leves compartilhados: contados 1× no produto (dedução das repetições).
+    // Inclui os materiais leves adicionados diretamente ao produto.
     const sharedLightTools = analisarLevesCompartilhados(
       componentLines,
       packagingLines,
       componentsById,
       lightToolsById,
+      directLightToolLines,
     )
     const directCost = productDirectCost({
       components: componentLines,
       packaging: packagingLines,
       supplies: supplyLines,
+      machineAssets: machineLines,
+      lightTools: directLightToolLines,
       finalHumanTimeHours,
       finalHumanHourlyRate: hourlyRate,
       lightToolDeduction: sharedLightTools.deduction,
@@ -178,8 +205,8 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
       marketplace,
       desiredNetValue: values.desiredNetValue ?? null,
     })
-    return { supplyLines, componentLines, packagingLines, finalHumanTimeHours, directCost, marketplace, pricing, sharedLightTools }
-  }, [values, componentsById, lightToolsById, suppliesById, settings, marketplaces])
+    return { supplyLines, componentLines, packagingLines, machineLines, directLightToolLines, finalHumanTimeHours, directCost, marketplace, pricing, sharedLightTools }
+  }, [values, componentsById, lightToolsById, suppliesById, heavyAssetsById, settings, marketplaces])
 
   const handleCancel = () => {
     if (isDirty) setDiscardOpen(true)
@@ -194,6 +221,8 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
         supplies: live.supplyLines,
         components: live.componentLines,
         packaging: live.packagingLines,
+        machineAssets: live.machineLines,
+        lightTools: live.directLightToolLines,
         finalHumanTimeHours: live.finalHumanTimeHours,
         finalHumanProfile: formValues.finalHumanProfile,
         directCost: live.directCost,
@@ -501,6 +530,161 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                     onClick={() => packagingFields.append({ componentId: '', quantity: 1, unitCostSnapshot: null })}
                   >
                     <Plus className="w-4 h-4" /> Adicionar embalagem
+                  </Button>
+                </div>
+              </Card>
+
+              {/* Ativos pesados diretos no produto (tempo de uso × custo/hora) */}
+              <Card>
+                <h3 className="font-semibold text-gray-900 mb-1">Ativos pesados</h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  Uso direto de ativos pesados no produto (tempo de uso × custo/hora do ativo).
+                </p>
+                <div className="space-y-3">
+                  {machineFields.fields.map((field, index) => {
+                    const line = values.machineAssets?.[index]
+                    const asset = line?.assetId ? heavyAssetsById.get(line.assetId) : undefined
+                    const currentCostPerHour = asset?.totalCostPerHour ?? null
+                    const savedSnapshot = line?.costPerHourSnapshot
+                    const hasChanged = currentCostPerHour != null && savedSnapshot != null && Math.abs(currentCostPerHour - savedSnapshot) > 1e-6
+                    const subtotal =
+                      currentCostPerHour != null && Number.isFinite(line?.timeMinutes)
+                        ? ((line?.timeMinutes ?? 0) / 60) * currentCostPerHour
+                        : null
+                    return (
+                      <div key={field.id} className="flex gap-3 items-start">
+                        <div className="flex-1">
+                          <Controller
+                            control={control}
+                            name={`machineAssets.${index}.assetId`}
+                            render={({ field: { onChange, value } }) => (
+                              <SelectSearchable
+                                options={heavyAssets
+                                  .filter((a) => !values.machineAssets?.some((existing, i) => existing.assetId === a.id && i !== index))
+                                  .map((a) => ({
+                                    value: a.id,
+                                    label: `${a.name} (${formatBRL(a.totalCostPerHour)}/h)`,
+                                  }))}
+                                value={value}
+                                onChange={onChange}
+                                placeholder="Selecione um ativo"
+                              />
+                            )}
+                          />
+                          {errors.machineAssets?.[index]?.assetId && (
+                            <FieldError>{errors.machineAssets?.[index]?.assetId?.message}</FieldError>
+                          )}
+                          {hasChanged && (
+                            <p className="text-xs text-amber-600 mt-1">
+                              Valor atual: {formatBRL(currentCostPerHour)}/h — atualize se quiser usar o novo custo.
+                            </p>
+                          )}
+                        </div>
+                        <div className="w-28">
+                          <Input
+                            type="number"
+                            step="1"
+                            min={0}
+                            placeholder="Min."
+                            error={!!errors.machineAssets?.[index]?.timeMinutes}
+                            {...register(`machineAssets.${index}.timeMinutes`, { valueAsNumber: true })}
+                          />
+                          {errors.machineAssets?.[index]?.timeMinutes && (
+                            <FieldError>{errors.machineAssets?.[index]?.timeMinutes?.message}</FieldError>
+                          )}
+                        </div>
+                        <div className="w-24 text-right text-sm text-gray-600 pt-2">
+                          {subtotal != null ? formatBRL(subtotal) : '—'}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => machineFields.remove(index)}
+                          className="p-2 text-gray-400 hover:text-red-600 transition"
+                          aria-label="Remover ativo"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="mt-4">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => machineFields.append({ assetId: '', timeMinutes: 0, costPerHourSnapshot: null })}
+                  >
+                    <Plus className="w-4 h-4" /> Adicionar ativo
+                  </Button>
+                </div>
+              </Card>
+
+              {/* Materiais leves diretos no produto (custo fixo; regra de contagem 1×) */}
+              <Card>
+                <h3 className="font-semibold text-gray-900 mb-1">Materiais leves</h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  Cada material entra com custo fixo (manutenção mensal). Se o mesmo material já
+                  estiver em um componente/embalagem, ele é contado <strong>apenas uma vez</strong>{' '}
+                  no produto.
+                </p>
+                <div className="space-y-3">
+                  {lightToolFields.fields.map((field, index) => {
+                    const line = values.lightTools?.[index]
+                    const tool = line?.toolId ? lightToolsById.get(line.toolId) : undefined
+                    const currentCost = tool?.monthlyMaintenanceCost ?? null
+                    const savedSnapshot = line?.costSnapshot
+                    const hasChanged = currentCost != null && savedSnapshot != null && Math.abs(currentCost - savedSnapshot) > 1e-6
+                    return (
+                      <div key={field.id} className="flex gap-3 items-start">
+                        <div className="flex-1">
+                          <Controller
+                            control={control}
+                            name={`lightTools.${index}.toolId`}
+                            render={({ field: { onChange, value } }) => (
+                              <SelectSearchable
+                                options={activeLightTools
+                                  .filter((t) => !values.lightTools?.some((existing, i) => existing.toolId === t.id && i !== index))
+                                  .map((t) => ({
+                                    value: t.id,
+                                    label: `${t.name} (${formatBRL(t.monthlyMaintenanceCost)})`,
+                                  }))}
+                                value={value}
+                                onChange={onChange}
+                                placeholder="Selecione um material leve"
+                              />
+                            )}
+                          />
+                          {errors.lightTools?.[index]?.toolId && (
+                            <FieldError>{errors.lightTools?.[index]?.toolId?.message}</FieldError>
+                          )}
+                          {hasChanged && (
+                            <p className="text-xs text-amber-600 mt-1">
+                              Valor atual: {formatBRL(currentCost)} — atualize se quiser usar o novo custo.
+                            </p>
+                          )}
+                        </div>
+                        <div className="w-24 text-right text-sm text-gray-600 pt-2">
+                          {currentCost != null ? formatBRL(currentCost) : '—'}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => lightToolFields.remove(index)}
+                          className="p-2 text-gray-400 hover:text-red-600 transition"
+                          aria-label="Remover material leve"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="mt-4">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => lightToolFields.append({ toolId: '', costSnapshot: null })}
+                  >
+                    <Plus className="w-4 h-4" /> Adicionar material leve
                   </Button>
                 </div>
               </Card>

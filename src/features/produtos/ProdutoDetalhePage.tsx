@@ -19,8 +19,9 @@ import {
   useMarketplaces,
   useSemiFinishedComponents,
   useSupplies,
+  useHeavyAssets,
 } from '../../services/firestore'
-import type { ProductComponentLine, ProductPackagingLine, ProductSupplyLine } from '../../types'
+import type { ProductComponentLine, ProductLightToolLine, ProductMachineLine, ProductPackagingLine, ProductSupplyLine } from '../../types'
 import { analisarLevesCompartilhados, hourlyRateForProfile, useProduct, useProductVersions, useSettingsDoc } from './data'
 import { computePricing } from './pricing'
 import { PricingBreakdown } from './components/PricingBreakdown'
@@ -39,6 +40,7 @@ export function ProdutoDetalhePage() {
   const { data: marketplaces } = useMarketplaces()
   const { data: lightTools } = useLightTools()
   const { data: supplies } = useSupplies()
+  const { data: heavyAssets } = useHeavyAssets()
   const versions = useProductVersions(product)
 
   const [margin, setMargin] = useState<number | null>(null)
@@ -59,6 +61,7 @@ export function ProdutoDetalhePage() {
   const componentsById = useMemo(() => new Map(components.map((c) => [c.id, c])), [components])
   const lightToolsById = useMemo(() => new Map(lightTools.map((t) => [t.id, t])), [lightTools])
   const suppliesById = useMemo(() => new Map(supplies.map((s) => [s.id, s])), [supplies])
+  const heavyAssetsById = useMemo(() => new Map(heavyAssets.map((a) => [a.id, a])), [heavyAssets])
 
   /** Materiais leves compartilhados entre os componentes/embalagens do produto. */
   const sharedLightTools = useMemo(() => {
@@ -68,6 +71,7 @@ export function ProdutoDetalhePage() {
       product.packaging,
       componentsById,
       lightToolsById,
+      product.lightTools ?? [],
     )
   }, [product, componentsById, lightToolsById])
 
@@ -135,14 +139,33 @@ export function ProdutoDetalhePage() {
         quantity: l.quantity,
         unitCostSnapshot: componentsById.get(l.componentId ?? '')?.unitCost ?? l.unitCostSnapshot,
       }))
+      const newMachineLines: ProductMachineLine[] = (product.machineAssets ?? []).map((l) => ({
+        assetId: l.assetId,
+        timeMinutes: l.timeMinutes,
+        costPerHourSnapshot: heavyAssetsById.get(l.assetId)?.totalCostPerHour ?? l.costPerHourSnapshot,
+      }))
+      const newDirectLightToolLines: ProductLightToolLine[] = (product.lightTools ?? []).map((l) => ({
+        toolId: l.toolId,
+        costSnapshot: lightToolsById.get(l.toolId)?.monthlyMaintenanceCost ?? l.costSnapshot,
+      }))
+      // Dedução recalculada com os custos de hoje (inclui os leves diretos do produto).
+      const newShared = analisarLevesCompartilhados(
+        newComponentLines,
+        newPackagingLines,
+        componentsById,
+        lightToolsById,
+        newDirectLightToolLines,
+      )
       const hourlyRate = hourlyRateForProfile(settings, product.finalHumanProfile)
       const directCost = productDirectCost({
         components: newComponentLines,
         packaging: newPackagingLines,
         supplies: newSupplyLines,
+        machineAssets: newMachineLines,
+        lightTools: newDirectLightToolLines,
         finalHumanTimeHours: product.finalHumanTimeHours,
         finalHumanHourlyRate: hourlyRate,
-        lightToolDeduction: sharedLightTools.deduction,
+        lightToolDeduction: newShared.deduction,
       })
       const newPricing = computePricing({
         directCost,
@@ -159,10 +182,12 @@ export function ProdutoDetalhePage() {
         supplies: newSupplyLines,
         components: newComponentLines,
         packaging: newPackagingLines,
+        machineAssets: newMachineLines,
+        lightTools: newDirectLightToolLines,
         finalHumanTimeHours: product.finalHumanTimeHours,
         finalHumanProfile: product.finalHumanProfile,
         directCost,
-        lightToolDeduction: sharedLightTools.deduction,
+        lightToolDeduction: newShared.deduction,
         profitMargin: product.profitMargin,
         marketplaceId: product.marketplaceId,
         desiredNetValue: product.desiredNetValue,
@@ -233,12 +258,14 @@ export function ProdutoDetalhePage() {
   }
 
   // Mão de obra exibida como "resto" do custo direto — sempre consistente com o snapshot.
-  // directCost = insumos extras + componentes + embalagens + mão de obra − dedução.
+  // directCost = insumos + componentes + embalagens + ativos pesados + leves diretos + mão de obra − dedução.
   const suppliesCost = (product.supplies ?? []).reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
   const componentsCost = product.components.reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
   const packagingCost = product.packaging.reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
+  const machineCost = (product.machineAssets ?? []).reduce((sum, l) => sum + (l.timeMinutes / 60) * l.costPerHourSnapshot, 0)
+  const directLightCost = (product.lightTools ?? []).reduce((sum, l) => sum + l.costSnapshot, 0)
   const lightToolDeduction = product.lightToolDeduction ?? 0
-  const humanCost = Math.max(product.directCost - suppliesCost - componentsCost - packagingCost + lightToolDeduction, 0)
+  const humanCost = Math.max(product.directCost - suppliesCost - componentsCost - packagingCost - machineCost - directLightCost + lightToolDeduction, 0)
   const profileLabel = product.finalHumanProfile === 'creative' ? 'Criativa' : 'Operacional'
 
   return (
@@ -342,6 +369,56 @@ export function ProdutoDetalhePage() {
                     </div>
                     <span className="font-medium text-gray-900 text-sm">
                       {formatBRL(line.quantity * line.unitCostSnapshot)}
+                    </span>
+                  </div>
+                )
+              })}
+              {(product.machineAssets ?? []).map((line, i) => {
+                const asset = heavyAssetsById.get(line.assetId)
+                const currentCost = asset?.totalCostPerHour
+                const changed = currentCost != null && Math.abs(currentCost - line.costPerHourSnapshot) > 1e-6
+                return (
+                  <div key={`m-${i}`} className="flex justify-between items-center p-3 rounded-xl bg-rose-50">
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">
+                        {asset?.name ?? 'Ativo removido'}
+                        {changed && (
+                          <span className="text-amber-600 ml-1">
+                            (atual: {formatBRL(currentCost)}/h)
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Ativo pesado · {formatMinutes(line.timeMinutes)} × {formatBRL(line.costPerHourSnapshot)}/h
+                      </p>
+                    </div>
+                    <span className="font-medium text-gray-900 text-sm">
+                      {formatBRL((line.timeMinutes / 60) * line.costPerHourSnapshot)}
+                    </span>
+                  </div>
+                )
+              })}
+              {(product.lightTools ?? []).map((line, i) => {
+                const tool = lightToolsById.get(line.toolId)
+                const currentCost = tool?.monthlyMaintenanceCost
+                const changed = currentCost != null && Math.abs(currentCost - line.costSnapshot) > 1e-6
+                return (
+                  <div key={`lt-${i}`} className="flex justify-between items-center p-3 rounded-xl bg-rose-50">
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">
+                        {tool?.name ?? 'Material removido'}
+                        {changed && (
+                          <span className="text-amber-600 ml-1">
+                            (atual: {formatBRL(currentCost)})
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Material leve · custo fixo (manutenção mensal)
+                      </p>
+                    </div>
+                    <span className="font-medium text-gray-900 text-sm">
+                      {formatBRL(line.costSnapshot)}
                     </span>
                   </div>
                 )
