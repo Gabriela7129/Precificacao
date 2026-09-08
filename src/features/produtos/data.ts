@@ -9,7 +9,16 @@
 
 import { useMemo } from 'react'
 import { createProduct, deleteProduct, useProducts, useSettings } from '../../services/firestore'
-import type { HumanProfile, Product, WithId, WorkspaceSettings } from '../../types'
+import type {
+  HumanProfile,
+  LightTool,
+  Product,
+  ProductComponentLine,
+  ProductPackagingLine,
+  SemiFinishedComponent,
+  WithId,
+  WorkspaceSettings,
+} from '../../types'
 
 /** Settings do workspace como doc único (o contrato retorna uma coleção). */
 export function useSettingsDoc(): { settings: WithId<WorkspaceSettings> | null; loading: boolean } {
@@ -53,6 +62,90 @@ export function useProductVersions(product: WithId<Product> | null): WithId<Prod
 }
 
 // ---------------------------------------------------------------------------
+// Materiais leves compartilhados entre componentes/embalagens do produto
+// ---------------------------------------------------------------------------
+
+export interface SharedLightToolInfo {
+  toolId: string
+  /** Nome do material leve ('Material removido' se saiu do cadastro). */
+  toolName: string
+  /** Total de aparições (Σ quantidades das linhas que usam o material). */
+  occurrences: number
+  /** Custo fixo mantido no produto (snapshot da primeira aparição). */
+  unitCost: number
+  /** Economia: custo total embutido nos componentes − 1× o custo fixo. */
+  deduction: number
+}
+
+export interface SharedLightToolsResult {
+  /** Materiais que aparecem mais de uma vez (occurrences > 1). */
+  infos: SharedLightToolInfo[]
+  /** Dedução total a subtrair do custo direto do produto. */
+  deduction: number
+}
+
+/**
+ * Analisa os materiais leves usados pelos componentes e embalagens do
+ * produto. Cada material é contabilizado UMA única vez no produto, mesmo
+ * aparecendo em vários componentes (ou em quantidade > 1): a dedução remove
+ * as repetições do custo direto. O custo mantido é o snapshot da primeira
+ * aparição; a dedução é a soma de todos os custos embutidos menos esse valor.
+ */
+export function analisarLevesCompartilhados(
+  componentLines: Pick<ProductComponentLine, 'componentId' | 'quantity'>[],
+  packagingLines: Pick<ProductPackagingLine, 'componentId' | 'quantity'>[],
+  componentsById: Map<string, WithId<SemiFinishedComponent>>,
+  lightToolsById: Map<string, WithId<LightTool>>,
+): SharedLightToolsResult {
+  // toolId → { occurrences, firstUnitCost, totalCost } somando todas as linhas.
+  const acc = new Map<
+    string,
+    { occurrences: number; firstUnitCost: number; totalCost: number }
+  >()
+
+  const addLine = (componentId: string | undefined, quantity: number) => {
+    if (!componentId) return
+    const componente = componentsById.get(componentId)
+    for (const line of componente?.lightTools ?? []) {
+      if (!line.toolId) continue
+      const qty = Number.isFinite(quantity) && quantity > 0 ? quantity : 1
+      const cost = line.costPerHourSnapshot ?? 0
+      const current = acc.get(line.toolId)
+      if (current) {
+        current.occurrences += qty
+        current.totalCost += qty * cost
+      } else {
+        acc.set(line.toolId, {
+          occurrences: qty,
+          firstUnitCost: cost,
+          totalCost: qty * cost,
+        })
+      }
+    }
+  }
+
+  for (const l of componentLines) addLine(l.componentId, l.quantity)
+  for (const l of packagingLines) addLine(l.componentId ?? undefined, l.quantity)
+
+  const infos: SharedLightToolInfo[] = []
+  let deduction = 0
+  for (const [toolId, { occurrences, firstUnitCost, totalCost }] of acc) {
+    if (occurrences <= 1) continue
+    const ded = totalCost - firstUnitCost
+    deduction += ded
+    infos.push({
+      toolId,
+      toolName: lightToolsById.get(toolId)?.name ?? 'Material removido',
+      occurrences,
+      unitCost: firstUnitCost,
+      deduction: ded,
+    })
+  }
+  infos.sort((a, b) => a.toolName.localeCompare(b.toolName, 'pt-BR'))
+  return { infos, deduction }
+}
+
+// ---------------------------------------------------------------------------
 // Duplicação e exclusão
 // ---------------------------------------------------------------------------
 
@@ -72,6 +165,7 @@ export async function duplicarProduto(
     finalHumanTimeHours: origem.finalHumanTimeHours,
     finalHumanProfile: origem.finalHumanProfile,
     directCost: origem.directCost,
+    lightToolDeduction: origem.lightToolDeduction ?? 0,
     profitMargin: origem.profitMargin,
     marketplaceId: origem.marketplaceId,
     desiredNetValue: origem.desiredNetValue,

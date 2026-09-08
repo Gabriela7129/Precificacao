@@ -208,6 +208,8 @@ export interface Product {
   finalHumanTimeHours: number
   finalHumanProfile: HumanProfile
   directCost: number
+  /** Dedução dos materiais leves compartilhados entre componentes/embalagens (contados 1×). */
+  lightToolDeduction?: number
   /** Margem de lucro em % (ex.: 40 = 40%). */
   profitMargin: number
   marketplaceId: string | null

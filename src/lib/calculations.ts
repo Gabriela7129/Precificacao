@@ -178,12 +178,15 @@ export interface DirectCostInput {
   packaging: ProductPackagingLine[]
   finalHumanTimeHours: number
   finalHumanHourlyRate: number
+  /** Dedução dos materiais leves compartilhados entre componentes (contados 1× no produto). */
+  lightToolDeduction?: number
 }
 
 /**
  * custo direto = Σ(componentes × quantidade × custo unitário)
  *              + Σ(embalagens × quantidade × custo)
  *              + (tempo humano final × valor hora)
+ *              − dedução de materiais leves compartilhados
  */
 export function productDirectCost(input: DirectCostInput): number {
   const componentsCost = input.components.reduce(
@@ -195,7 +198,7 @@ export function productDirectCost(input: DirectCostInput): number {
     0,
   )
   const humanCost = input.finalHumanTimeHours * input.finalHumanHourlyRate
-  return componentsCost + packagingCost + humanCost
+  return componentsCost + packagingCost + humanCost - (input.lightToolDeduction ?? 0)
 }
 
 /** preço sem taxas = custo direto × (1 + margem de lucro / 100) */

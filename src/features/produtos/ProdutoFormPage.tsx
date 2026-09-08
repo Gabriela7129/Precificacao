@@ -20,11 +20,12 @@ import {
   createProduct,
   updateProduct,
   useActiveWorkspaceId,
+  useLightTools,
   useMarketplaces,
   useSemiFinishedComponents,
 } from '../../services/firestore'
 import type { HumanProfile, ProductComponentLine, ProductPackagingLine } from '../../types'
-import { hourlyRateForProfile, useProduct, useSettingsDoc } from './data'
+import { analisarLevesCompartilhados, hourlyRateForProfile, useProduct, useSettingsDoc } from './data'
 import { computePricing } from './pricing'
 import { productFormSchema, type ProductFormValues } from './schema'
 import { PricingBreakdown } from './components/PricingBreakdown'
@@ -60,6 +61,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
   const { settings } = useSettingsDoc()
   const { data: components, loading: loadingComponents } = useSemiFinishedComponents()
   const { data: marketplaces, loading: loadingMarketplaces } = useMarketplaces()
+  const { data: lightTools } = useLightTools()
 
   const [saving, setSaving] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
@@ -67,6 +69,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
   const activeComponents = useMemo(() => components.filter((c) => !c.isArchived && !c.isPackaging), [components])
   const packagingComponents = useMemo(() => components.filter((c) => !c.isArchived && c.isPackaging), [components])
   const componentsById = useMemo(() => new Map(components.map((c) => [c.id, c])), [components])
+  const lightToolsById = useMemo(() => new Map(lightTools.map((t) => [t.id, t])), [lightTools])
 
   const {
     register,
@@ -139,11 +142,19 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
     const profile = values.finalHumanProfile ?? 'operational'
     const hourlyRate = hourlyRateForProfile(settings, profile)
     const finalHumanTimeHours = (values.finalHumanTimeMinutes ?? 0) / 60
+    // Materiais leves compartilhados: contados 1× no produto (dedução das repetições).
+    const sharedLightTools = analisarLevesCompartilhados(
+      componentLines,
+      packagingLines,
+      componentsById,
+      lightToolsById,
+    )
     const directCost = productDirectCost({
       components: componentLines,
       packaging: packagingLines,
       finalHumanTimeHours,
       finalHumanHourlyRate: hourlyRate,
+      lightToolDeduction: sharedLightTools.deduction,
     })
     const marketplace = marketplaces.find((m) => m.id === values.marketplaceId) ?? null
     const pricing = computePricing({
@@ -152,8 +163,8 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
       marketplace,
       desiredNetValue: values.desiredNetValue ?? null,
     })
-    return { componentLines, packagingLines, finalHumanTimeHours, directCost, marketplace, pricing }
-  }, [values, componentsById, settings, marketplaces])
+    return { componentLines, packagingLines, finalHumanTimeHours, directCost, marketplace, pricing, sharedLightTools }
+  }, [values, componentsById, lightToolsById, settings, marketplaces])
 
   const handleCancel = () => {
     if (isDirty) setDiscardOpen(true)
@@ -170,6 +181,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
         finalHumanTimeHours: live.finalHumanTimeHours,
         finalHumanProfile: formValues.finalHumanProfile,
         directCost: live.directCost,
+        lightToolDeduction: live.sharedLightTools.deduction,
         profitMargin: formValues.profitMargin ?? 0,
         marketplaceId: formValues.marketplaceId || null,
         desiredNetValue: formValues.desiredNetValue ?? null,
@@ -390,6 +402,41 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                   </Button>
                 </div>
               </Card>
+
+              {/* Materiais leves compartilhados — informação entre embalagem e acabamento */}
+              {live.sharedLightTools.infos.length > 0 && (
+                <Card className="bg-amber-50 border-amber-200">
+                  <h3 className="font-semibold text-gray-900 mb-1">
+                    Materiais leves compartilhados
+                  </h3>
+                  <p className="text-xs text-gray-600 mb-3">
+                    Estes materiais aparecem em mais de um componente/embalagem (ou em
+                    quantidade maior que 1) e são contabilizados <strong>apenas uma vez</strong> no
+                    custo do produto.
+                  </p>
+                  <div className="space-y-1.5">
+                    {live.sharedLightTools.infos.map((info) => (
+                      <div key={info.toolId} className="flex justify-between items-center text-sm">
+                        <span className="text-gray-700">
+                          {info.toolName}{' '}
+                          <span className="text-xs text-gray-500">
+                            ({info.occurrences}× {formatBRL(info.unitCost)})
+                          </span>
+                        </span>
+                        <span className="font-medium text-green-700">
+                          − {formatBRL(info.deduction)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center border-t border-amber-200 pt-1.5 text-sm">
+                      <span className="font-medium text-gray-900">Dedução total</span>
+                      <span className="font-bold text-green-700">
+                        − {formatBRL(live.sharedLightTools.deduction)}
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              )}
 
               {/* Acabamento final — tempo humano */}
               <Card>

@@ -15,11 +15,12 @@ import {
   createProduct,
   updateProduct,
   useActiveWorkspaceId,
+  useLightTools,
   useMarketplaces,
   useSemiFinishedComponents,
 } from '../../services/firestore'
 import type { ProductComponentLine, ProductPackagingLine } from '../../types'
-import { hourlyRateForProfile, useProduct, useProductVersions, useSettingsDoc } from './data'
+import { analisarLevesCompartilhados, hourlyRateForProfile, useProduct, useProductVersions, useSettingsDoc } from './data'
 import { computePricing } from './pricing'
 import { PricingBreakdown } from './components/PricingBreakdown'
 
@@ -35,6 +36,7 @@ export function ProdutoDetalhePage() {
   const { settings } = useSettingsDoc()
   const { data: components } = useSemiFinishedComponents()
   const { data: marketplaces } = useMarketplaces()
+  const { data: lightTools } = useLightTools()
   const versions = useProductVersions(product)
 
   const [margin, setMargin] = useState<number | null>(null)
@@ -53,6 +55,18 @@ export function ProdutoDetalhePage() {
   }, [product?.id])
 
   const componentsById = useMemo(() => new Map(components.map((c) => [c.id, c])), [components])
+  const lightToolsById = useMemo(() => new Map(lightTools.map((t) => [t.id, t])), [lightTools])
+
+  /** Materiais leves compartilhados entre os componentes/embalagens do produto. */
+  const sharedLightTools = useMemo(() => {
+    if (!product) return { infos: [], deduction: 0 }
+    return analisarLevesCompartilhados(
+      product.components,
+      product.packaging,
+      componentsById,
+      lightToolsById,
+    )
+  }, [product, componentsById, lightToolsById])
 
   const marketplace = useMemo(
     () => marketplaces.find((m) => m.id === marketplaceId) ?? null,
@@ -119,6 +133,7 @@ export function ProdutoDetalhePage() {
         packaging: newPackagingLines,
         finalHumanTimeHours: product.finalHumanTimeHours,
         finalHumanHourlyRate: hourlyRate,
+        lightToolDeduction: sharedLightTools.deduction,
       })
       const newPricing = computePricing({
         directCost,
@@ -137,6 +152,7 @@ export function ProdutoDetalhePage() {
         finalHumanTimeHours: product.finalHumanTimeHours,
         finalHumanProfile: product.finalHumanProfile,
         directCost,
+        lightToolDeduction: sharedLightTools.deduction,
         profitMargin: product.profitMargin,
         marketplaceId: product.marketplaceId,
         desiredNetValue: product.desiredNetValue,
@@ -207,9 +223,12 @@ export function ProdutoDetalhePage() {
   }
 
   // Mão de obra exibida como "resto" do custo direto — sempre consistente com o snapshot.
+  // Com a dedução de materiais leves compartilhados, ela entra na conta:
+  // directCost = componentes + embalagens + mão de obra − dedução.
   const componentsCost = product.components.reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
   const packagingCost = product.packaging.reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
-  const humanCost = Math.max(product.directCost - componentsCost - packagingCost, 0)
+  const lightToolDeduction = product.lightToolDeduction ?? 0
+  const humanCost = Math.max(product.directCost - componentsCost - packagingCost + lightToolDeduction, 0)
   const profileLabel = product.finalHumanProfile === 'creative' ? 'Criativa' : 'Operacional'
 
   return (
@@ -292,6 +311,37 @@ export function ProdutoDetalhePage() {
                   </div>
                 )
               })}
+              {sharedLightTools.infos.length > 0 && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
+                  <p className="font-medium text-gray-900 text-sm mb-1">
+                    Materiais leves compartilhados — contados 1×
+                  </p>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Aparecem em mais de um componente/embalagem (ou em quantidade maior que 1):
+                  </p>
+                  <div className="space-y-1">
+                    {sharedLightTools.infos.map((info) => (
+                      <div key={info.toolId} className="flex justify-between items-center text-xs">
+                        <span className="text-gray-700">
+                          {info.toolName}{' '}
+                          <span className="text-gray-500">
+                            ({info.occurrences}× {formatBRL(info.unitCost)})
+                          </span>
+                        </span>
+                        <span className="font-medium text-green-700">
+                          − {formatBRL(info.deduction)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center border-t border-amber-200 pt-1 text-xs">
+                      <span className="font-medium text-gray-900">Dedução total</span>
+                      <span className="font-bold text-green-700">
+                        − {formatBRL(sharedLightTools.deduction)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between items-center p-3 rounded-xl bg-amber-50">
                 <div>
                   <p className="font-medium text-gray-900 text-sm">Acabamento final</p>
