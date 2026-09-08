@@ -6,7 +6,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { Package, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Archive, Package, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Badge,
@@ -58,6 +58,7 @@ export function InsumosPage() {
 
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingSupply, setEditingSupply] = useState<WithId<Supply> | null>(null)
@@ -88,7 +89,7 @@ export function InsumosPage() {
   }, [entries])
 
   const totalStockValue = useMemo(
-    () => supplies.reduce((sum, supply) => sum + supply.totalStockValue, 0),
+    () => supplies.filter((s) => s.isActive !== false).reduce((sum, supply) => sum + supply.totalStockValue, 0),
     [supplies],
   )
 
@@ -96,12 +97,13 @@ export function InsumosPage() {
     const term = search.trim().toLocaleLowerCase('pt-BR')
     return supplies
       .filter((supply) => {
+        if (!showArchived && supply.isActive === false) return false
         if (categoryFilter && supply.categoryId !== categoryFilter) return false
         if (term && !supply.name.toLocaleLowerCase('pt-BR').includes(term)) return false
         return true
       })
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-  }, [supplies, search, categoryFilter])
+  }, [supplies, search, categoryFilter, showArchived])
 
   const openCreateForm = () => {
     setEditingSupply(null)
@@ -257,14 +259,17 @@ export function InsumosPage() {
           <p className="text-sm text-gray-500">Valor total em estoque</p>
           <p className="text-2xl font-bold text-rose-500 mt-1">{formatBRL(totalStockValue)}</p>
           <p className="text-xs text-gray-500 mt-1">
-            {supplies.length} {supplies.length === 1 ? 'insumo cadastrado' : 'insumos cadastrados'}
+            {supplies.filter((s) => s.isActive !== false).length}{' '}
+            {supplies.filter((s) => s.isActive !== false).length === 1 ? 'insumo cadastrado' : 'insumos cadastrados'}
+            {supplies.some((s) => s.isActive === false) &&
+              ` · ${supplies.filter((s) => s.isActive === false).length} arquivado(s)`}
           </p>
         </Card>
       )}
 
       {supplies.length > 0 && (
         <>
-          <div className="flex gap-3 mb-4">
+          <div className="flex gap-3 mb-4 items-center">
             <SearchInput
               className="flex-1 min-w-0 max-w-none"
               value={search}
@@ -285,6 +290,19 @@ export function InsumosPage() {
                 </option>
               ))}
             </Select>
+            <button
+              type="button"
+              onClick={() => setShowArchived((v) => !v)}
+              aria-pressed={showArchived}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border whitespace-nowrap transition ${
+                showArchived
+                  ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
+                  : 'bg-white text-gray-600 border-rose-200 hover:bg-rose-50'
+              }`}
+            >
+              <Archive className="w-4 h-4" />
+              Arquivados
+            </button>
           </div>
           <div className="mb-4">
             <button
@@ -329,8 +347,15 @@ export function InsumosPage() {
               const category = categoryById.get(supply.categoryId)
               const lastEntry = lastEntryDateBySupply.get(supply.id)
               return (
-                <TR key={supply.id}>
-                  <TD className="font-medium text-gray-900">{supply.name}</TD>
+                <TR key={supply.id} className={supply.isActive === false ? 'opacity-60' : ''}>
+                  <TD className="font-medium text-gray-900">
+                    {supply.name}
+                    {supply.isActive === false && (
+                      <span className="ml-2">
+                        <Badge variant="muted">Arquivado</Badge>
+                      </span>
+                    )}
+                  </TD>
                   <TD>
                     {category ? (
                       <Badge variant={categoryBadgeVariant(supply.categoryId)}>

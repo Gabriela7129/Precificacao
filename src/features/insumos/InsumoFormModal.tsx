@@ -3,10 +3,11 @@
  * Na criação: estoque inicial + custo médio inicial (com preview do valor
  * total em estoque). Na edição: estoque e valor total podem ser corrigidos
  * (o custo médio é recalculado como valor total ÷ estoque) — o fluxo normal
- * de mudanças de estoque continuam sendo as Entradas.
+ * de mudanças de estoque continuam sendo as Entradas. Também permite
+ * arquivar/reativar o insumo (arquivado some das composições de componente).
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -20,6 +21,7 @@ import {
   Modal,
   Select,
 } from '../../components/ui'
+import { Archive, ArchiveRestore } from 'lucide-react'
 import { formatBRL } from '../../lib/format'
 import {
   createSupply,
@@ -62,6 +64,8 @@ export function InsumoFormModal({
   const wsId = useActiveWorkspaceId()
   const { data: categories } = useSupplyCategories()
   const isEdit = supply != null
+  const isArchived = isEdit && !supply.isActive
+  const [archiving, setArchiving] = useState(false)
 
   const {
     register,
@@ -135,13 +139,46 @@ export function InsumoFormModal({
     }
   })
 
+  const handleToggleArchive = async () => {
+    if (!wsId || !supply) return
+    setArchiving(true)
+    try {
+      await updateSupply(wsId, supply.id, { isActive: !supply.isActive })
+      toast.success(supply.isActive ? 'Insumo arquivado' : 'Insumo reativado')
+      onClose()
+    } catch {
+      toast.error('Não foi possível salvar. Tente novamente.')
+    } finally {
+      setArchiving(false)
+    }
+  }
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={isEdit ? 'Editar insumo' : 'Novo insumo'}
+      title={isEdit ? (isArchived ? 'Editar insumo (arquivado)' : 'Editar insumo') : 'Novo insumo'}
       footer={
-        <div className="flex gap-3 justify-end">
+        <div className="flex gap-3 items-center">
+          {isEdit && (
+            <Button
+              variant="secondary"
+              onClick={() => void handleToggleArchive()}
+              loading={archiving}
+              disabled={isSubmitting}
+              className="mr-auto"
+            >
+              {isArchived ? (
+                <>
+                  <ArchiveRestore className="w-4 h-4" /> Reativar insumo
+                </>
+              ) : (
+                <>
+                  <Archive className="w-4 h-4" /> Arquivar insumo
+                </>
+              )}
+            </Button>
+          )}
           <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
             Cancelar
           </Button>
