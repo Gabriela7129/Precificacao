@@ -1,4 +1,5 @@
 export { ComponentesPage } from './ComponentesPage'
+export { ComponentesArquivadosPage } from './ComponentesArquivadosPage'
 export { ComponenteNovoPage } from './ComponenteNovoPage'
 export { ComponenteDetalhePage } from './ComponenteDetalhePage'
 export { ComponenteFormPage } from './ComponenteFormPage'

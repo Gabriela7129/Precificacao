@@ -1,16 +1,17 @@
 /**
  * `/componentes` — grid de cards dos componentes NÃO arquivados.
+ * Abas Produto/Embalagem, busca por nome e atalho para arquivados
+ * (mesmo padrão da página de produtos).
  */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Copy, Package, Pencil, Trash2, Wrench } from 'lucide-react'
+import { Archive, Package, Search, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
-import { Badge, Button, CardsSkeleton, ConfirmDialog, EmptyState, PageHeader } from '../../components/ui'
-import { Card } from '../../components/ui'
+import { Button, CardsSkeleton, ConfirmDialog, EmptyState, PageHeader, SearchInput } from '../../components/ui'
 import { useActiveWorkspaceId, useProducts, useSemiFinishedComponents } from '../../services/firestore'
-import { formatBRL, formatMinutes } from '../../lib/format'
 import { duplicarComponente, excluirComponente } from './data'
+import { ComponentCard } from './components/ComponentCard'
 
 type ListaView = 'produtos' | 'embalagens'
 
@@ -20,6 +21,7 @@ export function ComponentesPage() {
   const { data, loading } = useSemiFinishedComponents()
   const { data: products } = useProducts()
   const [view, setView] = useState<ListaView>('produtos')
+  const [query, setQuery] = useState('')
   const [duplicandoId, setDuplicandoId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<(typeof data)[number] | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -69,11 +71,15 @@ export function ComponentesPage() {
     ? data.filter((c) => c.name === deleteTarget.name).length
     : 0
 
-  const ativos = data
-    .filter((c) =>
-      !c.isArchived && (view === 'embalagens' ? c.isPackaging === true : !c.isPackaging),
-    )
-    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+  const ativos = useMemo(() => {
+    const term = query.trim().toLocaleLowerCase('pt-BR')
+    return data
+      .filter((c) =>
+        !c.isArchived && (view === 'embalagens' ? c.isPackaging === true : !c.isPackaging),
+      )
+      .filter((c) => !term || c.name.toLocaleLowerCase('pt-BR').includes(term))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+  }, [data, view, query])
 
   const rotaNovo = view === 'embalagens' ? '/componentes/novo?tipo=embalagem' : '/componentes/novo'
   const labelNovo = view === 'embalagens' ? '+ Nova embalagem' : '+ Novo componente'
@@ -89,10 +95,17 @@ export function ComponentesPage() {
     <div>
       <PageHeader
         title="Componentes Semi-Acabados"
-        actions={<Button onClick={() => navigate(rotaNovo)}>{labelNovo}</Button>}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => navigate('/componentes/arquivados')}>
+              <Archive className="w-4 h-4" /> Arquivados
+            </Button>
+            <Button onClick={() => navigate(rotaNovo)}>{labelNovo}</Button>
+          </>
+        }
       />
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-4">
         <button type="button" onClick={() => setView('produtos')} className={tabClass(view === 'produtos')}>
           Produto
         </button>
@@ -103,97 +116,53 @@ export function ComponentesPage() {
 
       {loading ? (
         <CardsSkeleton />
-      ) : ativos.length === 0 ? (
-        <EmptyState
-          icon={view === 'embalagens' ? Package : Wrench}
-          title={view === 'embalagens' ? 'Nenhuma embalagem cadastrada' : 'Nenhum componente cadastrado'}
-          description={
-            view === 'embalagens'
-              ? 'Crie embalagens como componentes para usar na seção de embalagens dos produtos.'
-              : "Crie itens intermediários como 'Miolo A5 Costurado' para reutilizar nos produtos."
-          }
-          actionLabel={labelNovo}
-          onAction={() => navigate(rotaNovo)}
-        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {ativos.map((componente) => {
-            const machineAssets = componente.machineAssets ?? []
-            const lightTools = componente.lightTools ?? []
-            const totalMachineMinutes = machineAssets.reduce(
-              (sum, l) => sum + (l.timeMinutes || 0),
-              0,
+        <>
+          {data.some((c) => !c.isArchived) && (
+            <div className="mb-6">
+              <SearchInput
+                className="max-w-none"
+                value={query}
+                onChange={setQuery}
+                placeholder={view === 'embalagens' ? 'Buscar embalagem...' : 'Buscar componente...'}
+              />
+            </div>
+          )}
+          {ativos.length === 0 ? (
+            query.trim() ? (
+              <EmptyState
+                icon={Search}
+                title="Nenhum componente encontrado"
+                description="Ajuste a busca para encontrar o componente."
+              />
+            ) : (
+              <EmptyState
+                icon={view === 'embalagens' ? Package : Wrench}
+                title={view === 'embalagens' ? 'Nenhuma embalagem cadastrada' : 'Nenhum componente cadastrado'}
+                description={
+                  view === 'embalagens'
+                    ? 'Crie embalagens como componentes para usar na seção de embalagens dos produtos.'
+                    : "Crie itens intermediários como 'Miolo A5 Costurado' para reutilizar nos produtos."
+                }
+                actionLabel={labelNovo}
+                onAction={() => navigate(rotaNovo)}
+              />
             )
-            const totalHumanMinutes = Math.round(componente.humanTimeHours * 60)
-            // Materiais leves têm custo fixo (sem tempo) — não entram no total de minutos.
-            const totalMinutos = totalMachineMinutes + totalHumanMinutes
-            const meta = [
-              `${componente.supplies.length} ${componente.supplies.length === 1 ? 'insumo' : 'insumos'}`,
-              `${machineAssets.length} ${machineAssets.length === 1 ? 'ativo' : 'ativos'}`,
-              lightTools.length > 0 ? `${lightTools.length} mat. leve` : undefined,
-              formatMinutes(totalMinutos),
-            ]
-              .filter(Boolean)
-              .join(' · ')
-
-            return (
-              <Card
-                key={componente.id}
-                onClick={() => navigate(`/componentes/${componente.id}`)}
-              >
-                <div className="flex justify-between items-start mb-1">
-                  <h3 className="font-semibold text-lg text-gray-900">{componente.name}</h3>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="rose">v{componente.version}</Badge>
-                    <button
-                      type="button"
-                      aria-label="Duplicar componente"
-                      title="Duplicar componente"
-                      disabled={duplicandoId === componente.id}
-                      className="p-1.5 rounded-lg text-gray-500 hover:bg-rose-100 hover:text-rose-600 transition disabled:opacity-50"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDuplicar(componente)
-                      }}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Ver / editar"
-                      className="p-1.5 rounded-lg text-gray-500 hover:bg-rose-100 hover:text-rose-600 transition"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigate(`/componentes/${componente.id}`)
-                      }}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Excluir componente"
-                      title="Excluir componente"
-                      className="p-1.5 rounded-lg text-gray-500 hover:bg-rose-100 hover:text-red-600 transition"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setDeleteTarget(componente)
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-500">{meta}</p>
-                <div className="flex justify-between items-end mt-6">
-                  <span className="text-sm text-gray-500">Custo unitário</span>
-                  <span className="text-2xl font-bold text-rose-500">
-                    {formatBRL(componente.unitCost)}
-                  </span>
-                </div>
-              </Card>
-            )
-          })}
-        </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {ativos.map((componente) => (
+                <ComponentCard
+                  key={componente.id}
+                  componente={componente}
+                  onClick={() => navigate(`/componentes/${componente.id}`)}
+                  onDuplicate={() => void handleDuplicar(componente)}
+                  duplicating={duplicandoId === componente.id}
+                  onDelete={() => setDeleteTarget(componente)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <ConfirmDialog

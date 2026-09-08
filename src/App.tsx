@@ -7,7 +7,7 @@ import { LoginPage } from './features/auth/LoginPage'
 import { ConfiguracoesPage } from './features/configuracoes'
 import { MateriaisLevesPage, AtivosPesadosPage } from './features/materiais-ativos'
 import { InsumosPage } from './features/insumos'
-import { ComponentesPage, ComponenteNovoPage, ComponenteDetalhePage } from './features/componentes'
+import { ComponentesPage, ComponentesArquivadosPage, ComponenteNovoPage, ComponenteDetalhePage } from './features/componentes'
 import {
   ProdutosPage,
   ProdutoNovoPage,
@@ -68,6 +68,7 @@ export default function App() {
           <Route path="/ativos-pesados" element={<AtivosPesadosPage />} />
           <Route path="/insumos" element={<InsumosPage />} />
           <Route path="/componentes" element={<ComponentesPage />} />
+          <Route path="/componentes/arquivados" element={<ComponentesArquivadosPage />} />
           <Route path="/componentes/novo" element={<ComponenteNovoPage />} />
           <Route path="/componentes/:id" element={<ComponenteDetalhePage />} />
           <Route path="/produtos" element={<ProdutosPage />} />
