@@ -9,8 +9,9 @@ export interface PricingBreakdownProps {
 
 /**
  * Breakdown canônico de precificação (design.md 5.12): Custo direto /
- * Margem (R$) / Preço sem taxas / Taxa do marketplace / Preço de venda /
- * Valor líquido. Sem fórmulas visíveis — só resultados.
+ * Margem (R$) / Preço sem taxas / Taxa do marketplace / Preço de venda.
+ * O líquido é o próprio preço sem taxas — sem linha separada.
+ * Sem fórmulas visíveis — só resultados.
  */
 export function PricingBreakdown({ pricing, directCost, hasMarketplace }: PricingBreakdownProps) {
   return (
@@ -36,10 +37,6 @@ export function PricingBreakdown({ pricing, directCost, hasMarketplace }: Pricin
       <div className="flex justify-between items-center border-t border-rose-100 pt-2">
         <span className="font-medium text-gray-900">Preço de venda</span>
         <span className="text-lg font-bold text-rose-500">{formatBRL(pricing.salePrice)}</span>
-      </div>
-      <div className="flex justify-between text-sm text-gray-500">
-        <span>Valor líquido</span>
-        <span>{formatBRL(pricing.valorLiquido)}</span>
       </div>
     </div>
   )

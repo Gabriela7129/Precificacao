@@ -2,10 +2,8 @@
  * Cálculo de precificação do produto — camada fina sobre `src/lib/calculations.ts`.
  * Nenhuma fórmula vive aqui; apenas orquestração dos parâmetros do módulo.
  */
-
 import {
   marketplaceFee,
-  netValueFromSalePrice,
   priceWithoutFees,
   salePriceFromDesiredNet,
 } from '../../lib/calculations'
@@ -20,16 +18,17 @@ export interface PricingResult {
   taxaMarketplace: number
   /** Preço de venda no marketplace selecionado. */
   salePrice: number
-  /** Valor líquido estimado após taxas. */
-  valorLiquido: number
 }
 
 /**
- * Regras:
- * - Com `desiredNetValue` preenchido E marketplace selecionado → cálculo
- *   reverso: preço = (líquido + taxaFixa) / (1 − taxa%/100).
- * - Caso contrário → preço de venda = preço sem taxas; o valor líquido
- *   exibido é o líquido estimado sobre esse preço no marketplace selecionado.
+ * Regra: preço de venda = preço sem taxas + taxa do marketplace.
+ * A taxa percentual incide sobre o preço de venda, de modo que
+ * preço de venda − taxa = preço sem taxas (o líquido É o preço sem taxas —
+ * por isso não há linha de "valor líquido" no breakdown).
+ *
+ * Com `desiredNetValue` preenchido E marketplace selecionado, o líquido
+ * desejado substitui o preço sem taxas como base do cálculo reverso:
+ * preço = (líquido + taxaFixa) / (1 − taxa%/100).
  */
 export function computePricing(args: {
   directCost: number
@@ -42,23 +41,24 @@ export function computePricing(args: {
   const feePct = marketplace?.feePercentage ?? 0
   const fixedFee = marketplace?.fixedFee ?? null
 
+  // Base sobre a qual a taxa do marketplace é aplicada.
+  const base = desiredNetValue != null && marketplace ? desiredNetValue : precoSemTaxas
+
   let salePrice: number
-  if (desiredNetValue != null && marketplace) {
-    salePrice = salePriceFromDesiredNet(desiredNetValue, feePct, fixedFee)
+  if (marketplace) {
+    // preço de venda = base + taxa; como a taxa % incide sobre o preço de
+    // venda, resolve-se por: (base + taxaFixa) / (1 − taxa%/100).
+    salePrice = salePriceFromDesiredNet(base, feePct, fixedFee)
   } else {
     salePrice = precoSemTaxas
   }
 
   const taxaMarketplace = marketplace ? marketplaceFee(salePrice, feePct, fixedFee) : 0
-  const valorLiquido = marketplace
-    ? netValueFromSalePrice(salePrice, feePct, fixedFee)
-    : salePrice
 
   return {
     margemValor: precoSemTaxas - directCost,
     precoSemTaxas,
     taxaMarketplace,
     salePrice,
-    valorLiquido,
   }
 }
