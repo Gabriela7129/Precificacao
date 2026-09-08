@@ -121,10 +121,7 @@ export function EntradaEstoqueModal({ open, onClose, supply }: EntradaEstoqueMod
   })
 
   const activeSupplies = useMemo(
-    () =>
-      supplies
-        .filter((s) => s.isActive !== false)
-        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+    () => [...supplies].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
     [supplies],
   )
 
