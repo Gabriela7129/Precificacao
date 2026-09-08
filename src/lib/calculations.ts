@@ -5,7 +5,7 @@
  * viver em componentes de UI.
  */
 
-import type { ComponentSupplyLine, ProductComponentLine, ProductPackagingLine } from '../types'
+import type { ComponentSupplyLine, ProductComponentLine, ProductPackagingLine, ProductSupplyLine } from '../types'
 
 // ---------------------------------------------------------------------------
 // Constantes de negócio
@@ -176,6 +176,8 @@ export function componentUnitCost(input: ComponentCostInput): number {
 export interface DirectCostInput {
   components: ProductComponentLine[]
   packaging: ProductPackagingLine[]
+  /** Insumos extras adicionados diretamente ao produto. */
+  supplies?: ProductSupplyLine[]
   finalHumanTimeHours: number
   finalHumanHourlyRate: number
   /** Dedução dos materiais leves compartilhados entre componentes (contados 1× no produto). */
@@ -185,6 +187,7 @@ export interface DirectCostInput {
 /**
  * custo direto = Σ(componentes × quantidade × custo unitário)
  *              + Σ(embalagens × quantidade × custo)
+ *              + Σ(insumos extras × quantidade × custo médio)
  *              + (tempo humano final × valor hora)
  *              − dedução de materiais leves compartilhados
  */
@@ -197,8 +200,12 @@ export function productDirectCost(input: DirectCostInput): number {
     (sum, line) => sum + line.quantity * line.unitCostSnapshot,
     0,
   )
+  const suppliesCost = (input.supplies ?? []).reduce(
+    (sum, line) => sum + line.quantity * line.unitCostSnapshot,
+    0,
+  )
   const humanCost = input.finalHumanTimeHours * input.finalHumanHourlyRate
-  return componentsCost + packagingCost + humanCost - (input.lightToolDeduction ?? 0)
+  return componentsCost + packagingCost + suppliesCost + humanCost - (input.lightToolDeduction ?? 0)
 }
 
 /** preço sem taxas = custo direto × (1 + margem de lucro / 100) */

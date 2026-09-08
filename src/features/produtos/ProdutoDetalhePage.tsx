@@ -18,8 +18,9 @@ import {
   useLightTools,
   useMarketplaces,
   useSemiFinishedComponents,
+  useSupplies,
 } from '../../services/firestore'
-import type { ProductComponentLine, ProductPackagingLine } from '../../types'
+import type { ProductComponentLine, ProductPackagingLine, ProductSupplyLine } from '../../types'
 import { analisarLevesCompartilhados, hourlyRateForProfile, useProduct, useProductVersions, useSettingsDoc } from './data'
 import { computePricing } from './pricing'
 import { PricingBreakdown } from './components/PricingBreakdown'
@@ -37,6 +38,7 @@ export function ProdutoDetalhePage() {
   const { data: components } = useSemiFinishedComponents()
   const { data: marketplaces } = useMarketplaces()
   const { data: lightTools } = useLightTools()
+  const { data: supplies } = useSupplies()
   const versions = useProductVersions(product)
 
   const [margin, setMargin] = useState<number | null>(null)
@@ -56,6 +58,7 @@ export function ProdutoDetalhePage() {
 
   const componentsById = useMemo(() => new Map(components.map((c) => [c.id, c])), [components])
   const lightToolsById = useMemo(() => new Map(lightTools.map((t) => [t.id, t])), [lightTools])
+  const suppliesById = useMemo(() => new Map(supplies.map((s) => [s.id, s])), [supplies])
 
   /** Materiais leves compartilhados entre os componentes/embalagens do produto. */
   const sharedLightTools = useMemo(() => {
@@ -117,6 +120,11 @@ export function ProdutoDetalhePage() {
     setActing(true)
     try {
       // Nova versão com os custos de HOJE (snapshots atualizados).
+      const newSupplyLines: ProductSupplyLine[] = (product.supplies ?? []).map((l) => ({
+        supplyId: l.supplyId,
+        quantity: l.quantity,
+        unitCostSnapshot: suppliesById.get(l.supplyId)?.averageCost ?? l.unitCostSnapshot,
+      }))
       const newComponentLines: ProductComponentLine[] = product.components.map((l) => ({
         componentId: l.componentId,
         quantity: l.quantity,
@@ -131,6 +139,7 @@ export function ProdutoDetalhePage() {
       const directCost = productDirectCost({
         components: newComponentLines,
         packaging: newPackagingLines,
+        supplies: newSupplyLines,
         finalHumanTimeHours: product.finalHumanTimeHours,
         finalHumanHourlyRate: hourlyRate,
         lightToolDeduction: sharedLightTools.deduction,
@@ -147,6 +156,7 @@ export function ProdutoDetalhePage() {
       await updateProduct(wsId, product.id, { isArchived: true })
       const newId = await createProduct(wsId, {
         name: product.name,
+        supplies: newSupplyLines,
         components: newComponentLines,
         packaging: newPackagingLines,
         finalHumanTimeHours: product.finalHumanTimeHours,
@@ -223,12 +233,12 @@ export function ProdutoDetalhePage() {
   }
 
   // Mão de obra exibida como "resto" do custo direto — sempre consistente com o snapshot.
-  // Com a dedução de materiais leves compartilhados, ela entra na conta:
-  // directCost = componentes + embalagens + mão de obra − dedução.
+  // directCost = insumos extras + componentes + embalagens + mão de obra − dedução.
+  const suppliesCost = (product.supplies ?? []).reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
   const componentsCost = product.components.reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
   const packagingCost = product.packaging.reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
   const lightToolDeduction = product.lightToolDeduction ?? 0
-  const humanCost = Math.max(product.directCost - componentsCost - packagingCost + lightToolDeduction, 0)
+  const humanCost = Math.max(product.directCost - suppliesCost - componentsCost - packagingCost + lightToolDeduction, 0)
   const profileLabel = product.finalHumanProfile === 'creative' ? 'Criativa' : 'Operacional'
 
   return (
@@ -261,6 +271,31 @@ export function ProdutoDetalhePage() {
           <Card>
             <h3 className="font-semibold text-gray-900 mb-4">Composição</h3>
             <div className="space-y-2">
+              {(product.supplies ?? []).map((line, i) => {
+                const supply = suppliesById.get(line.supplyId)
+                const currentCost = supply?.averageCost
+                const changed = currentCost != null && Math.abs(currentCost - line.unitCostSnapshot) > 1e-6
+                return (
+                  <div key={`s-${i}`} className="flex justify-between items-center p-3 rounded-xl bg-rose-50">
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">
+                        {supply?.name ?? 'Insumo removido'}
+                        {changed && (
+                          <span className="text-amber-600 ml-1">
+                            (atual: {formatBRL(currentCost)})
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Insumo extra · {line.quantity} un × {formatBRL(line.unitCostSnapshot)}
+                      </p>
+                    </div>
+                    <span className="font-medium text-gray-900 text-sm">
+                      {formatBRL(line.quantity * line.unitCostSnapshot)}
+                    </span>
+                  </div>
+                )
+              })}
               {product.components.map((line, i) => {
                 const component = componentsById.get(line.componentId)
                 const currentCost = component?.unitCost

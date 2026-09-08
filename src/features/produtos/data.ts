@@ -160,6 +160,7 @@ export async function duplicarProduto(
 ): Promise<string> {
   return createProduct(wsId, {
     name: `${origem.name} (cópia)`,
+    supplies: (origem.supplies ?? []).map((l) => ({ ...l })),
     components: (origem.components ?? []).map((l) => ({ ...l })),
     packaging: (origem.packaging ?? []).map((l) => ({ ...l })),
     finalHumanTimeHours: origem.finalHumanTimeHours,

@@ -191,6 +191,14 @@ export interface ProductComponentLine {
   unitCostSnapshot: number
 }
 
+/** Insumo adicionado diretamente ao produto (detalhe extra, ex.: fita de cetim a mais). */
+export interface ProductSupplyLine {
+  supplyId: string
+  quantity: number
+  /** Snapshot do custo médio unitário do insumo na data da montagem. */
+  unitCostSnapshot: number
+}
+
 export interface ProductPackagingLine {
   /** Em produtos antigos era supplyId; novos usam componentId. Mantemos ambos opcionais para compatibilidade. */
   supplyId?: string
@@ -205,6 +213,8 @@ export interface Product {
   name: string
   components: ProductComponentLine[]
   packaging: ProductPackagingLine[]
+  /** Insumos extras diretos no produto (opcional — produtos antigos não têm). */
+  supplies?: ProductSupplyLine[]
   finalHumanTimeHours: number
   finalHumanProfile: HumanProfile
   directCost: number

@@ -11,6 +11,15 @@ const quantitySchema = z
 
 export const productFormSchema = z.object({
   name: z.string().min(2, 'Informe um nome com pelo menos 2 caracteres'),
+  /** Insumos extras adicionados diretamente ao produto (detalhes pequenos). */
+  supplies: z.array(
+    z.object({
+      supplyId: z.string().min(1, 'Selecione um insumo'),
+      quantity: quantitySchema,
+      /** Snapshot salvo do custo médio no momento da montagem (para detectar valores desatualizados). */
+      unitCostSnapshot: z.number().nullable(),
+    }),
+  ),
   components: z.array(
     z.object({
       componentId: z.string().min(1, 'Selecione um componente'),
