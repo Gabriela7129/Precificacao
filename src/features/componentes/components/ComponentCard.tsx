@@ -1,4 +1,4 @@
-import { Archive, Copy, Package, Pencil, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, Copy, Package, Pencil, Trash2 } from 'lucide-react'
 import { Badge, Button, Card } from '../../../components/ui'
 import { formatBRL, formatDate, formatMinutes } from '../../../lib/format'
 import type { SemiFinishedComponent, WithId } from '../../../types'
@@ -12,6 +12,9 @@ export interface ComponentCardProps {
   onDuplicate?: () => void
   duplicating?: boolean
   onDelete?: () => void
+  /** Restaurar componente arquivado (ausente = sem botão). */
+  onRestore?: () => void
+  restoring?: boolean
 }
 
 /** Card canônico de componente (ativo ou arquivado). */
@@ -22,6 +25,8 @@ export function ComponentCard({
   onDuplicate,
   duplicating = false,
   onDelete,
+  onRestore,
+  restoring = false,
 }: ComponentCardProps) {
   const machineAssets = componente.machineAssets ?? []
   const lightTools = componente.lightTools ?? []
@@ -46,14 +51,29 @@ export function ComponentCard({
   return (
     <Card onClick={onClick} className={archived ? 'opacity-70' : ''}>
       <div className="flex justify-between items-start mb-1">
-        <div className="min-w-0">
-          <h3 className="font-semibold text-lg text-gray-900 truncate">{componente.name}</h3>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold text-lg text-gray-900 break-words">{componente.name}</h3>
           {infoVersao && <p className="text-sm text-gray-500">{infoVersao}</p>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Badge variant={archived ? 'muted' : 'rose'}>
             {archived ? <span className="flex items-center gap-1"><Archive className="w-3 h-3" /> v{componente.version}</span> : `v${componente.version}`}
           </Badge>
+          {archived && onRestore && (
+            <button
+              type="button"
+              aria-label="Restaurar componente"
+              title="Restaurar componente"
+              disabled={restoring}
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-rose-100 hover:text-rose-600 transition disabled:opacity-50"
+              onClick={(e) => {
+                e.stopPropagation()
+                onRestore()
+              }}
+            >
+              <ArchiveRestore className="w-4 h-4" />
+            </button>
+          )}
           {!archived && onDuplicate && (
             <button
               type="button"

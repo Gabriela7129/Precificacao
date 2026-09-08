@@ -1,19 +1,23 @@
 /**
- * `/componentes/arquivados` — versões arquivadas, somente leitura
- * (mesmo padrão de /produtos/arquivados).
+ * `/componentes/arquivados` — versões arquivadas, somente leitura, com
+ * opção de restaurar (voltar para a lista de ativos).
  */
 
 import { Archive, ArrowLeft } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CardsSkeleton, EmptyState, SearchInput } from '../../components/ui'
-import { useSemiFinishedComponents } from '../../services/firestore'
+import { toast } from 'sonner'
+import { CardsSkeleton, ConfirmDialog, EmptyState, SearchInput } from '../../components/ui'
+import { updateComponent, useActiveWorkspaceId, useSemiFinishedComponents } from '../../services/firestore'
 import { ComponentCard } from './components/ComponentCard'
 
 export function ComponentesArquivadosPage() {
   const navigate = useNavigate()
+  const wsId = useActiveWorkspaceId()
   const { data, loading } = useSemiFinishedComponents()
   const [query, setQuery] = useState('')
+  const [restoreTarget, setRestoreTarget] = useState<(typeof data)[number] | null>(null)
+  const [restoring, setRestoring] = useState(false)
 
   const archived = useMemo(() => {
     const term = query.trim().toLocaleLowerCase('pt-BR')
@@ -25,6 +29,24 @@ export function ComponentesArquivadosPage() {
           a.name.localeCompare(b.name, 'pt-BR') || b.version - a.version,
       )
   }, [data, query])
+
+  /** Existe outra versão ativa com o mesmo nome? (gerada por reavaliação) */
+  const temVersaoAtiva = (componente: (typeof data)[number]) =>
+    data.some((c) => !c.isArchived && c.name === componente.name)
+
+  const handleRestore = async () => {
+    if (!wsId || !restoreTarget) return
+    setRestoring(true)
+    try {
+      await updateComponent(wsId, restoreTarget.id, { isArchived: false })
+      toast.success(`"${restoreTarget.name}" restaurado`)
+      setRestoreTarget(null)
+    } catch {
+      toast.error('Não foi possível restaurar. Tente novamente.')
+    } finally {
+      setRestoring(false)
+    }
+  }
 
   return (
     <div>
@@ -58,7 +80,7 @@ export function ComponentesArquivadosPage() {
             <EmptyState
               icon={Archive}
               title="Nenhum componente arquivado"
-              description="Versões antigas aparecem aqui quando você reavalia custos de um componente."
+              description="Versões antigas aparecem aqui quando você reavalia custos ou arquiva um componente."
             />
           ) : archived.length === 0 ? (
             <EmptyState
@@ -74,12 +96,31 @@ export function ComponentesArquivadosPage() {
                   componente={componente}
                   archived
                   onClick={() => navigate(`/componentes/${componente.id}`)}
+                  onRestore={() => setRestoreTarget(componente)}
+                  restoring={restoring && restoreTarget?.id === componente.id}
                 />
               ))}
             </div>
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={restoreTarget != null}
+        onClose={() => setRestoreTarget(null)}
+        onConfirm={() => void handleRestore()}
+        title="Restaurar componente?"
+        body={
+          restoreTarget
+            ? temVersaoAtiva(restoreTarget)
+              ? `"${restoreTarget.name}" (v${restoreTarget.version}) voltará para a lista de componentes. Atenção: já existe uma versão ativa com este nome — as duas aparecerão lado a lado.`
+              : `"${restoreTarget.name}" (v${restoreTarget.version}) voltará para a lista de componentes e poderá ser editado novamente.`
+            : ''
+        }
+        confirmLabel="Restaurar"
+        variant="primary"
+        loading={restoring}
+      />
     </div>
   )
 }
