@@ -176,6 +176,7 @@ export async function duplicarProduto(
     lightTools: (origem.lightTools ?? []).map((l) => ({ ...l })),
     finalHumanTimeHours: origem.finalHumanTimeHours,
     finalHumanProfile: origem.finalHumanProfile,
+    ...(origem.finalHumanHourlyRate != null ? { finalHumanHourlyRate: origem.finalHumanHourlyRate } : {}),
     directCost: origem.directCost,
     lightToolDeduction: origem.lightToolDeduction ?? 0,
     profitMargin: origem.profitMargin,

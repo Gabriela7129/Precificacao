@@ -186,6 +186,7 @@ export function ProdutoDetalhePage() {
         lightTools: newDirectLightToolLines,
         finalHumanTimeHours: product.finalHumanTimeHours,
         finalHumanProfile: product.finalHumanProfile,
+        finalHumanHourlyRate: hourlyRate,
         directCost,
         lightToolDeduction: newShared.deduction,
         profitMargin: product.profitMargin,
@@ -257,15 +258,23 @@ export function ProdutoDetalhePage() {
     )
   }
 
-  // Mão de obra exibida como "resto" do custo direto — sempre consistente com o snapshot.
-  // directCost = insumos + componentes + embalagens + ativos pesados + leves diretos + mão de obra − dedução.
-  const suppliesCost = (product.supplies ?? []).reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
-  const componentsCost = product.components.reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
-  const packagingCost = product.packaging.reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
-  const machineCost = (product.machineAssets ?? []).reduce((sum, l) => sum + (l.timeMinutes / 60) * l.costPerHourSnapshot, 0)
+  // Mão de obra do acabamento final. F1: produtos novos salvam o valor-hora
+  // (finalHumanHourlyRate) — exibimos horas × taxa salva. Documentos legados
+  // não têm a taxa: mantém o cálculo anterior ("resto" do custo direto),
+  // consistente com o snapshot salvo.
   const directLightCost = (product.lightTools ?? []).reduce((sum, l) => sum + l.costSnapshot, 0)
-  const lightToolDeduction = product.lightToolDeduction ?? 0
-  const humanCost = Math.max(product.directCost - suppliesCost - componentsCost - packagingCost - machineCost - directLightCost + lightToolDeduction, 0)
+  let humanCost: number
+  if (product.finalHumanHourlyRate != null) {
+    humanCost = product.finalHumanTimeHours * product.finalHumanHourlyRate
+  } else {
+    // directCost = insumos + componentes + embalagens + ativos + leves diretos + mão de obra − dedução.
+    const suppliesCost = (product.supplies ?? []).reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
+    const componentsCost = product.components.reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
+    const packagingCost = product.packaging.reduce((sum, l) => sum + l.quantity * l.unitCostSnapshot, 0)
+    const machineCost = (product.machineAssets ?? []).reduce((sum, l) => sum + (l.timeMinutes / 60) * l.costPerHourSnapshot, 0)
+    const lightToolDeduction = product.lightToolDeduction ?? 0
+    humanCost = Math.max(product.directCost - suppliesCost - componentsCost - packagingCost - machineCost - directLightCost + lightToolDeduction, 0)
+  }
   const profileLabel = product.finalHumanProfile === 'creative' ? 'Criativa' : 'Operacional'
 
   return (
