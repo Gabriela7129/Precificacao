@@ -191,7 +191,7 @@ export interface ProductComponentLine {
   unitCostSnapshot: number
 }
 
-/** Insumo adicionado diretamente ao produto (detalhe extra, ex.: fita de cetim a mais). */
+/** Insumo adicionado diretamente ao produto (detalhe pequeno, ex.: fita de cetim a mais). */
 export interface ProductSupplyLine {
   supplyId: string
   quantity: number
@@ -228,7 +228,7 @@ export interface Product {
   name: string
   components: ProductComponentLine[]
   packaging: ProductPackagingLine[]
-  /** Insumos extras diretos no produto (opcional — produtos antigos não têm). */
+  /** Insumos diretos no produto (opcional — produtos antigos não têm). */
   supplies?: ProductSupplyLine[]
   /** Ativos pesados diretos no produto (tempo de uso × custo/hora). */
   machineAssets?: ProductMachineLine[]

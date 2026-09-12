@@ -288,92 +288,6 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                 {errors.name && <FieldError>{errors.name.message}</FieldError>}
               </Card>
 
-              {/* Insumos extras — detalhes pequenos direto no produto (mesma lógica dos componentes) */}
-              <Card>
-                <h3 className="font-semibold text-gray-900 mb-1">Insumos extras</h3>
-                <p className="text-xs text-gray-500 mb-4">
-                  Para detalhes pequenos colocados direto no produto (ex.: uma fita de cetim a
-                  mais) sem precisar criar um componente.
-                </p>
-                <div className="space-y-3">
-                  {supplyFields.fields.map((field, index) => {
-                    const line = values.supplies?.[index]
-                    const supply = line?.supplyId ? suppliesById.get(line.supplyId) : undefined
-                    const currentUnitCost = supply?.averageCost ?? null
-                    const savedSnapshot = line?.unitCostSnapshot
-                    const hasChanged = currentUnitCost != null && savedSnapshot != null && Math.abs(currentUnitCost - savedSnapshot) > 1e-6
-                    const subtotal =
-                      currentUnitCost != null && Number.isFinite(line?.quantity)
-                        ? currentUnitCost * (line?.quantity ?? 0)
-                        : null
-                    return (
-                      <div key={field.id} className="flex gap-3 items-start">
-                        <div className="flex-1">
-                          <Controller
-                            control={control}
-                            name={`supplies.${index}.supplyId`}
-                            render={({ field: { onChange, value } }) => (
-                              <SelectSearchable
-                                options={activeSupplies
-                                  .filter((s) => !values.supplies?.some((existing, i) => existing.supplyId === s.id && i !== index))
-                                  .map((s) => ({
-                                    value: s.id,
-                                    label: `${s.name} (${formatBRL(s.averageCost)}/${s.unit})`,
-                                  }))}
-                                value={value}
-                                onChange={onChange}
-                                placeholder="Selecione um insumo"
-                              />
-                            )}
-                          />
-                          {errors.supplies?.[index]?.supplyId && (
-                            <FieldError>{errors.supplies?.[index]?.supplyId?.message}</FieldError>
-                          )}
-                          {hasChanged && (
-                            <p className="text-xs text-amber-600 mt-1">
-                              Valor atual: {formatBRL(currentUnitCost)} — atualize se quiser usar o novo custo.
-                            </p>
-                          )}
-                        </div>
-                        <div className="w-28">
-                          <Input
-                            type="number"
-                            step="any"
-                            min={0}
-                            placeholder="Qtd."
-                            error={!!errors.supplies?.[index]?.quantity}
-                            {...register(`supplies.${index}.quantity`, { valueAsNumber: true })}
-                          />
-                          {errors.supplies?.[index]?.quantity && (
-                            <FieldError>{errors.supplies?.[index]?.quantity?.message}</FieldError>
-                          )}
-                        </div>
-                        <div className="w-24 text-right text-sm text-gray-600 pt-2">
-                          {subtotal != null ? formatBRL(subtotal) : '—'}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => supplyFields.remove(index)}
-                          className="p-2 text-gray-400 hover:text-red-600 transition"
-                          aria-label="Remover insumo"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="mt-4">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => supplyFields.append({ supplyId: '', quantity: 1, unitCostSnapshot: null })}
-                  >
-                    <Plus className="w-4 h-4" /> Adicionar insumo
-                  </Button>
-                </div>
-              </Card>
-
               {/* Componentes semi-acabados */}
               <Card>
                 <h3 className="font-semibold text-gray-900 mb-4">Componentes</h3>
@@ -530,6 +444,92 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                     onClick={() => packagingFields.append({ componentId: '', quantity: 1, unitCostSnapshot: null })}
                   >
                     <Plus className="w-4 h-4" /> Adicionar embalagem
+                  </Button>
+                </div>
+              </Card>
+
+              {/* Insumos diretos no produto (detalhes pequenos, ex.: fita de cetim extra) */}
+              <Card>
+                <h3 className="font-semibold text-gray-900 mb-1">Insumos</h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  Para detalhes pequenos colocados direto no produto (ex.: uma fita de cetim a
+                  mais) sem precisar criar um componente.
+                </p>
+                <div className="space-y-3">
+                  {supplyFields.fields.map((field, index) => {
+                    const line = values.supplies?.[index]
+                    const supply = line?.supplyId ? suppliesById.get(line.supplyId) : undefined
+                    const currentUnitCost = supply?.averageCost ?? null
+                    const savedSnapshot = line?.unitCostSnapshot
+                    const hasChanged = currentUnitCost != null && savedSnapshot != null && Math.abs(currentUnitCost - savedSnapshot) > 1e-6
+                    const subtotal =
+                      currentUnitCost != null && Number.isFinite(line?.quantity)
+                        ? currentUnitCost * (line?.quantity ?? 0)
+                        : null
+                    return (
+                      <div key={field.id} className="flex gap-3 items-start">
+                        <div className="flex-1">
+                          <Controller
+                            control={control}
+                            name={`supplies.${index}.supplyId`}
+                            render={({ field: { onChange, value } }) => (
+                              <SelectSearchable
+                                options={activeSupplies
+                                  .filter((s) => !values.supplies?.some((existing, i) => existing.supplyId === s.id && i !== index))
+                                  .map((s) => ({
+                                    value: s.id,
+                                    label: `${s.name} (${formatBRL(s.averageCost)}/${s.unit})`,
+                                  }))}
+                                value={value}
+                                onChange={onChange}
+                                placeholder="Selecione um insumo"
+                              />
+                            )}
+                          />
+                          {errors.supplies?.[index]?.supplyId && (
+                            <FieldError>{errors.supplies?.[index]?.supplyId?.message}</FieldError>
+                          )}
+                          {hasChanged && (
+                            <p className="text-xs text-amber-600 mt-1">
+                              Valor atual: {formatBRL(currentUnitCost)} — atualize se quiser usar o novo custo.
+                            </p>
+                          )}
+                        </div>
+                        <div className="w-28">
+                          <Input
+                            type="number"
+                            step="any"
+                            min={0}
+                            placeholder="Qtd."
+                            error={!!errors.supplies?.[index]?.quantity}
+                            {...register(`supplies.${index}.quantity`, { valueAsNumber: true })}
+                          />
+                          {errors.supplies?.[index]?.quantity && (
+                            <FieldError>{errors.supplies?.[index]?.quantity?.message}</FieldError>
+                          )}
+                        </div>
+                        <div className="w-24 text-right text-sm text-gray-600 pt-2">
+                          {subtotal != null ? formatBRL(subtotal) : '—'}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => supplyFields.remove(index)}
+                          className="p-2 text-gray-400 hover:text-red-600 transition"
+                          aria-label="Remover insumo"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="mt-4">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => supplyFields.append({ supplyId: '', quantity: 1, unitCostSnapshot: null })}
+                  >
+                    <Plus className="w-4 h-4" /> Adicionar insumo
                   </Button>
                 </div>
               </Card>

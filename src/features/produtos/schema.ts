@@ -11,7 +11,7 @@ const quantitySchema = z
 
 export const productFormSchema = z.object({
   name: z.string().min(2, 'Informe um nome com pelo menos 2 caracteres'),
-  /** Insumos extras adicionados diretamente ao produto (detalhes pequenos). */
+  /** Insumos adicionados diretamente ao produto (detalhes pequenos). */
   supplies: z.array(
     z.object({
       supplyId: z.string().min(1, 'Selecione um insumo'),

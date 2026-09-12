@@ -298,31 +298,6 @@ export function ProdutoDetalhePage() {
           <Card>
             <h3 className="font-semibold text-gray-900 mb-4">Composição</h3>
             <div className="space-y-2">
-              {(product.supplies ?? []).map((line, i) => {
-                const supply = suppliesById.get(line.supplyId)
-                const currentCost = supply?.averageCost
-                const changed = currentCost != null && Math.abs(currentCost - line.unitCostSnapshot) > 1e-6
-                return (
-                  <div key={`s-${i}`} className="flex justify-between items-center p-3 rounded-xl bg-rose-50">
-                    <div>
-                      <p className="font-medium text-gray-900 text-sm">
-                        {supply?.name ?? 'Insumo removido'}
-                        {changed && (
-                          <span className="text-amber-600 ml-1">
-                            (atual: {formatBRL(currentCost)})
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Insumo extra · {line.quantity} un × {formatBRL(line.unitCostSnapshot)}
-                      </p>
-                    </div>
-                    <span className="font-medium text-gray-900 text-sm">
-                      {formatBRL(line.quantity * line.unitCostSnapshot)}
-                    </span>
-                  </div>
-                )
-              })}
               {product.components.map((line, i) => {
                 const component = componentsById.get(line.componentId)
                 const currentCost = component?.unitCost
@@ -365,6 +340,31 @@ export function ProdutoDetalhePage() {
                       </p>
                       <p className="text-xs text-gray-500">
                         Embalagem · {line.quantity} un × {formatBRL(line.unitCostSnapshot)}
+                      </p>
+                    </div>
+                    <span className="font-medium text-gray-900 text-sm">
+                      {formatBRL(line.quantity * line.unitCostSnapshot)}
+                    </span>
+                  </div>
+                )
+              })}
+              {(product.supplies ?? []).map((line, i) => {
+                const supply = suppliesById.get(line.supplyId)
+                const currentCost = supply?.averageCost
+                const changed = currentCost != null && Math.abs(currentCost - line.unitCostSnapshot) > 1e-6
+                return (
+                  <div key={`s-${i}`} className="flex justify-between items-center p-3 rounded-xl bg-rose-50">
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">
+                        {supply?.name ?? 'Insumo removido'}
+                        {changed && (
+                          <span className="text-amber-600 ml-1">
+                            (atual: {formatBRL(currentCost)})
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Insumo · {line.quantity} un × {formatBRL(line.unitCostSnapshot)}
                       </p>
                     </div>
                     <span className="font-medium text-gray-900 text-sm">
