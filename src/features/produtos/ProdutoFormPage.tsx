@@ -140,44 +140,55 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
 
   const values = watch()
 
-  // Cálculo ao vivo: snapshots atuais de custo + valor hora do perfil.
+  // F1 (integridade histórica): na edição, o valor-hora salvo no produto é
+  // preservado; trocar o perfil de mão de obra resolve para as settings atuais.
+  const savedFinalHumanHourlyRate =
+    mode === 'edit' && product && values.finalHumanProfile === product.finalHumanProfile
+      ? (product.finalHumanHourlyRate ?? null)
+      : null
+
+  // Cálculo ao vivo: F1 — snapshots salvos são PRESERVADOS na edição; linhas
+  // novas (ou com entidade trocada) usam o custo ATUAL.
   const live = useMemo(() => {
     const supplyLines: ProductSupplyLine[] = (values.supplies ?? [])
       .filter((l) => l.supplyId && Number.isFinite(l.quantity))
       .map((l) => ({
         supplyId: l.supplyId,
         quantity: l.quantity,
-        unitCostSnapshot: suppliesById.get(l.supplyId)?.averageCost ?? 0,
+        unitCostSnapshot: l.unitCostSnapshot ?? suppliesById.get(l.supplyId)?.averageCost ?? 0,
       }))
     const componentLines: ProductComponentLine[] = (values.components ?? [])
       .filter((l) => l.componentId && Number.isFinite(l.quantity))
       .map((l) => ({
         componentId: l.componentId,
         quantity: l.quantity,
-        unitCostSnapshot: componentsById.get(l.componentId)?.unitCost ?? 0,
+        unitCostSnapshot: l.unitCostSnapshot ?? componentsById.get(l.componentId)?.unitCost ?? 0,
       }))
     const packagingLines: ProductPackagingLine[] = (values.packaging ?? [])
       .filter((l) => l.componentId && Number.isFinite(l.quantity))
       .map((l) => ({
         componentId: l.componentId,
         quantity: l.quantity,
-        unitCostSnapshot: componentsById.get(l.componentId)?.unitCost ?? 0,
+        unitCostSnapshot: l.unitCostSnapshot ?? componentsById.get(l.componentId)?.unitCost ?? 0,
       }))
     const machineLines: ProductMachineLine[] = (values.machineAssets ?? [])
       .filter((l) => l.assetId && Number.isFinite(l.timeMinutes))
       .map((l) => ({
         assetId: l.assetId,
         timeMinutes: l.timeMinutes,
-        costPerHourSnapshot: heavyAssetsById.get(l.assetId)?.totalCostPerHour ?? 0,
+        costPerHourSnapshot: l.costPerHourSnapshot ?? heavyAssetsById.get(l.assetId)?.totalCostPerHour ?? 0,
       }))
     const directLightToolLines: ProductLightToolLine[] = (values.lightTools ?? [])
       .filter((l) => l.toolId)
       .map((l) => ({
         toolId: l.toolId,
-        costSnapshot: lightToolsById.get(l.toolId)?.monthlyMaintenanceCost ?? 0,
+        costSnapshot: l.costSnapshot ?? lightToolsById.get(l.toolId)?.monthlyMaintenanceCost ?? 0,
       }))
     const profile = values.finalHumanProfile ?? 'operational'
-    const hourlyRate = hourlyRateForProfile(settings, profile)
+    const settingsHourlyRate = hourlyRateForProfile(settings, profile)
+    // F1: valor-hora do acabamento — snapshot preservado na edição; fallback
+    // (criação/legado/troca de perfil) usa as settings atuais.
+    const hourlyRate = savedFinalHumanHourlyRate ?? settingsHourlyRate
     const finalHumanTimeHours = (values.finalHumanTimeMinutes ?? 0) / 60
     // Materiais leves compartilhados: contados 1× no produto (dedução das repetições).
     // Inclui os materiais leves adicionados diretamente ao produto.
@@ -205,8 +216,9 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
       marketplace,
       desiredNetValue: values.desiredNetValue ?? null,
     })
-    return { supplyLines, componentLines, packagingLines, machineLines, directLightToolLines, finalHumanTimeHours, directCost, marketplace, pricing, sharedLightTools }
-  }, [values, componentsById, lightToolsById, suppliesById, heavyAssetsById, settings, marketplaces])
+    return { supplyLines, componentLines, packagingLines, machineLines, directLightToolLines, finalHumanTimeHours, finalHumanHourlyRate: hourlyRate, directCost, marketplace, pricing, sharedLightTools }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values, componentsById, lightToolsById, suppliesById, heavyAssetsById, settings, marketplaces, savedFinalHumanHourlyRate])
 
   const handleCancel = () => {
     if (isDirty) setDiscardOpen(true)
@@ -225,6 +237,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
         lightTools: live.directLightToolLines,
         finalHumanTimeHours: live.finalHumanTimeHours,
         finalHumanProfile: formValues.finalHumanProfile,
+        finalHumanHourlyRate: live.finalHumanHourlyRate,
         directCost: live.directCost,
         lightToolDeduction: live.sharedLightTools.deduction,
         profitMargin: formValues.profitMargin ?? 0,
@@ -298,7 +311,8 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                     const currentUnitCost = component?.unitCost ?? null
                     const savedSnapshot = line?.unitCostSnapshot
                     const hasChanged = currentUnitCost != null && savedSnapshot != null && Math.abs(currentUnitCost - savedSnapshot) > 1e-6
-                    const unitCost = currentUnitCost
+                    // F1: o subtotal exibido (e salvo) usa o snapshot preservado; linha nova usa o custo atual.
+                    const unitCost = savedSnapshot ?? currentUnitCost
                     const subtotal =
                       unitCost != null && Number.isFinite(line?.quantity)
                         ? unitCost * (line?.quantity ?? 0)
@@ -315,7 +329,11 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                                   .filter((c) => !values.components?.some((existing, i) => existing.componentId === c.id && i !== index))
                                   .map((c) => ({ value: c.id, label: c.name }))}
                                 value={value}
-                                onChange={onChange}
+                                onChange={(next) => {
+                                  // F1: trocar o componente descarta o snapshot (custo atual será resolvido).
+                                  if (next !== value) setValue(`components.${index}.unitCostSnapshot`, null)
+                                  onChange(next)
+                                }}
                                 placeholder="Selecione um componente"
                               />
                             )}
@@ -325,7 +343,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                           )}
                           {hasChanged && (
                             <p className="text-xs text-amber-600 mt-1">
-                              Valor atual: {formatBRL(currentUnitCost)} — atualize se quiser usar o novo custo.
+                              Valor atual: {formatBRL(currentUnitCost)} — use Reavaliar custos para atualizar.
                             </p>
                           )}
                         </div>
@@ -378,7 +396,8 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                     const currentUnitCost = component?.unitCost ?? null
                     const savedSnapshot = line?.unitCostSnapshot
                     const hasChanged = currentUnitCost != null && savedSnapshot != null && Math.abs(currentUnitCost - savedSnapshot) > 1e-6
-                    const unitCost = currentUnitCost
+                    // F1: o subtotal exibido (e salvo) usa o snapshot preservado; linha nova usa o custo atual.
+                    const unitCost = savedSnapshot ?? currentUnitCost
                     const subtotal =
                       unitCost != null && Number.isFinite(line?.quantity)
                         ? unitCost * (line?.quantity ?? 0)
@@ -395,7 +414,11 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                                   .filter((c) => !values.packaging?.some((existing, i) => existing.componentId === c.id && i !== index))
                                   .map((c) => ({ value: c.id, label: c.name }))}
                                 value={value}
-                                onChange={onChange}
+                                onChange={(next) => {
+                                  // F1: trocar a embalagem descarta o snapshot (custo atual será resolvido).
+                                  if (next !== value) setValue(`packaging.${index}.unitCostSnapshot`, null)
+                                  onChange(next)
+                                }}
                                 placeholder="Selecione uma embalagem"
                               />
                             )}
@@ -405,7 +428,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                           )}
                           {hasChanged && (
                             <p className="text-xs text-amber-600 mt-1">
-                              Valor atual: {formatBRL(currentUnitCost)} — atualize se quiser usar o novo custo.
+                              Valor atual: {formatBRL(currentUnitCost)} — use Reavaliar custos para atualizar.
                             </p>
                           )}
                         </div>
@@ -462,9 +485,11 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                     const currentUnitCost = supply?.averageCost ?? null
                     const savedSnapshot = line?.unitCostSnapshot
                     const hasChanged = currentUnitCost != null && savedSnapshot != null && Math.abs(currentUnitCost - savedSnapshot) > 1e-6
+                    // F1: o subtotal exibido (e salvo) usa o snapshot preservado; linha nova usa o custo atual.
+                    const effectiveUnitCost = savedSnapshot ?? currentUnitCost
                     const subtotal =
-                      currentUnitCost != null && Number.isFinite(line?.quantity)
-                        ? currentUnitCost * (line?.quantity ?? 0)
+                      effectiveUnitCost != null && Number.isFinite(line?.quantity)
+                        ? effectiveUnitCost * (line?.quantity ?? 0)
                         : null
                     return (
                       <div key={field.id} className="flex gap-3 items-start">
@@ -481,7 +506,11 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                                     label: `${s.name} (${formatBRL(s.averageCost)}/${s.unit})`,
                                   }))}
                                 value={value}
-                                onChange={onChange}
+                                onChange={(next) => {
+                                  // F1: trocar o insumo descarta o snapshot (custo atual será resolvido).
+                                  if (next !== value) setValue(`supplies.${index}.unitCostSnapshot`, null)
+                                  onChange(next)
+                                }}
                                 placeholder="Selecione um insumo"
                               />
                             )}
@@ -491,7 +520,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                           )}
                           {hasChanged && (
                             <p className="text-xs text-amber-600 mt-1">
-                              Valor atual: {formatBRL(currentUnitCost)} — atualize se quiser usar o novo custo.
+                              Valor atual: {formatBRL(currentUnitCost)} — use Reavaliar custos para atualizar.
                             </p>
                           )}
                         </div>
@@ -547,9 +576,11 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                     const currentCostPerHour = asset?.totalCostPerHour ?? null
                     const savedSnapshot = line?.costPerHourSnapshot
                     const hasChanged = currentCostPerHour != null && savedSnapshot != null && Math.abs(currentCostPerHour - savedSnapshot) > 1e-6
+                    // F1: o subtotal exibido (e salvo) usa o snapshot preservado; linha nova usa o custo atual.
+                    const effectiveCostPerHour = savedSnapshot ?? currentCostPerHour
                     const subtotal =
-                      currentCostPerHour != null && Number.isFinite(line?.timeMinutes)
-                        ? ((line?.timeMinutes ?? 0) / 60) * currentCostPerHour
+                      effectiveCostPerHour != null && Number.isFinite(line?.timeMinutes)
+                        ? ((line?.timeMinutes ?? 0) / 60) * effectiveCostPerHour
                         : null
                     return (
                       <div key={field.id} className="flex gap-3 items-start">
@@ -566,7 +597,11 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                                     label: `${a.name} (${formatBRL(a.totalCostPerHour)}/h)`,
                                   }))}
                                 value={value}
-                                onChange={onChange}
+                                onChange={(next) => {
+                                  // F1: trocar o ativo descarta o snapshot (custo atual será resolvido).
+                                  if (next !== value) setValue(`machineAssets.${index}.costPerHourSnapshot`, null)
+                                  onChange(next)
+                                }}
                                 placeholder="Selecione um ativo"
                               />
                             )}
@@ -576,7 +611,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                           )}
                           {hasChanged && (
                             <p className="text-xs text-amber-600 mt-1">
-                              Valor atual: {formatBRL(currentCostPerHour)}/h — atualize se quiser usar o novo custo.
+                              Valor atual: {formatBRL(currentCostPerHour)}/h — use Reavaliar custos para atualizar.
                             </p>
                           )}
                         </div>
@@ -634,6 +669,8 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                     const currentCost = tool?.monthlyMaintenanceCost ?? null
                     const savedSnapshot = line?.costSnapshot
                     const hasChanged = currentCost != null && savedSnapshot != null && Math.abs(currentCost - savedSnapshot) > 1e-6
+                    // F1: o custo exibido (e salvo) usa o snapshot preservado; linha nova usa o custo atual.
+                    const effectiveCost = savedSnapshot ?? currentCost
                     return (
                       <div key={field.id} className="flex gap-3 items-start">
                         <div className="flex-1">
@@ -649,7 +686,11 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                                     label: `${t.name} (${formatBRL(t.monthlyMaintenanceCost)})`,
                                   }))}
                                 value={value}
-                                onChange={onChange}
+                                onChange={(next) => {
+                                  // F1: trocar o material descarta o snapshot (custo atual será resolvido).
+                                  if (next !== value) setValue(`lightTools.${index}.costSnapshot`, null)
+                                  onChange(next)
+                                }}
                                 placeholder="Selecione um material leve"
                               />
                             )}
@@ -659,12 +700,12 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                           )}
                           {hasChanged && (
                             <p className="text-xs text-amber-600 mt-1">
-                              Valor atual: {formatBRL(currentCost)} — atualize se quiser usar o novo custo.
+                              Valor atual: {formatBRL(currentCost)} — use Reavaliar custos para atualizar.
                             </p>
                           )}
                         </div>
                         <div className="w-24 text-right text-sm text-gray-600 pt-2">
-                          {currentCost != null ? formatBRL(currentCost) : '—'}
+                          {effectiveCost != null ? formatBRL(effectiveCost) : '—'}
                         </div>
                         <button
                           type="button"

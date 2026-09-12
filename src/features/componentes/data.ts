@@ -71,14 +71,23 @@ export function useComposicaoData(): {
 // ---------------------------------------------------------------------------
 
 export interface ComposicaoCustoInput {
-  /** Linhas em edição (sem snapshot — o custo médio atual é aplicado aqui). */
-  supplies: { supplyId: string; quantity: number }[]
-  /** Lista de ativos pesados + tempo em minutos. */
-  machineAssets: { assetId: string; timeMinutes: number }[]
-  /** Lista de materiais leves (custo fixo = manutenção mensal do item). */
-  lightTools: { toolId: string }[]
+  /**
+   * Linhas em edição. F1 (integridade histórica): quando `unitCostSnapshot`
+   * está presente (edição de linha existente), ele é preservado; `null`
+   * (linha nova ou entidade trocada) resolve para o custo médio ATUAL.
+   */
+  supplies: { supplyId: string; quantity: number; unitCostSnapshot?: number | null }[]
+  /** Lista de ativos pesados + tempo em minutos (mesma regra de snapshot). */
+  machineAssets: { assetId: string; timeMinutes: number; costPerHourSnapshot?: number | null }[]
+  /** Lista de materiais leves — custo fixo = manutenção mensal (mesma regra de snapshot). */
+  lightTools: { toolId: string; costPerHourSnapshot?: number | null }[]
   humanProfile: HumanProfile
   humanTimeMinutes: number
+  /**
+   * F1: snapshot do valor-hora salvo no documento (edição). `null`/ausente
+   * (criação, legado ou perfil trocado) resolve para o valor hora das settings.
+   */
+  humanHourlyRate?: number | null
 }
 
 export interface ComposicaoCusto {
@@ -92,12 +101,17 @@ export interface ComposicaoCusto {
   humanCost: number
   unitCost: number
   humanTimeHours: number
+  /** Valor-hora efetivamente usado (snapshot preservado ou settings) — persistir. */
+  humanHourlyRate: number
 }
 
 /**
- * Recalcula o custo da composição com os custos ATUAIS de insumos, ativos
- * pesados, materiais leves e valor hora das settings. Toda a matemática passa
- * por `calculations.ts`; aqui só resolvemos as referências e convertemos
+ * Recalcula o custo da composição. F1 (integridade histórica): snapshots
+ * salvos são PRESERVADOS na edição — só linhas novas (ou com entidade
+ * trocada) usam os custos atuais de insumos, ativos, materiais leves e
+ * settings. "Reavaliar custos" (reavaliarComponente) é a única porta que
+ * ignora snapshots e usa tudo de hoje. Toda a matemática passa por
+ * `calculations.ts`; aqui só resolvemos as referências e convertemos
  * minutos → horas.
  */
 export function calcularCustoComposicao(
@@ -109,21 +123,25 @@ export function calcularCustoComposicao(
 ): ComposicaoCusto {
   const humanTimeHours = input.humanTimeMinutes / 60
 
-  const humanHourlyRate =
+  const settingsHourlyRate =
     input.humanProfile === 'creative'
       ? (settings?.hourlyCreative ?? 0)
       : (settings?.hourlyOperational ?? 0)
+  // F1: preserva o valor-hora da composição; fallback (criação/legado sem
+  // snapshot) usa as settings atuais.
+  const humanHourlyRate = input.humanHourlyRate ?? settingsHourlyRate
 
-  // Snapshot do custo médio de cada insumo neste momento.
+  // F1: snapshot preservado na edição; linha nova usa o custo médio atual.
   const lines: ComponentSupplyLine[] = input.supplies
     .filter((l) => l.supplyId !== '')
     .map((l) => ({
       supplyId: l.supplyId,
       quantity: l.quantity,
-      unitCostSnapshot: supplies.find((s) => s.id === l.supplyId)?.averageCost ?? 0,
+      unitCostSnapshot:
+        l.unitCostSnapshot ?? supplies.find((s) => s.id === l.supplyId)?.averageCost ?? 0,
     }))
 
-  // Ativos pesados: tempo em minutos → horas + snapshot custo/hora.
+  // Ativos pesados: tempo em minutos → horas + snapshot preservado/atual.
   const machineLines: ComponentMachineLine[] = input.machineAssets
     .filter((l) => l.assetId !== '')
     .map((l) => {
@@ -131,7 +149,7 @@ export function calcularCustoComposicao(
       return {
         assetId: l.assetId,
         timeMinutes: l.timeMinutes,
-        costPerHourSnapshot: asset?.totalCostPerHour ?? 0,
+        costPerHourSnapshot: l.costPerHourSnapshot ?? asset?.totalCostPerHour ?? 0,
       }
     })
 
@@ -144,7 +162,7 @@ export function calcularCustoComposicao(
       return {
         toolId: l.toolId,
         timeMinutes: 0,
-        costPerHourSnapshot: tool?.monthlyMaintenanceCost ?? 0,
+        costPerHourSnapshot: l.costPerHourSnapshot ?? tool?.monthlyMaintenanceCost ?? 0,
       }
     })
 
@@ -171,7 +189,7 @@ export function calcularCustoComposicao(
     humanHourlyRate,
   })
 
-  return { lines, machineLines, lightToolLines, suppliesCost, machineCost, lightToolCost, humanCost, unitCost, humanTimeHours }
+  return { lines, machineLines, lightToolLines, suppliesCost, machineCost, lightToolCost, humanCost, unitCost, humanTimeHours, humanHourlyRate }
 }
 
 // ---------------------------------------------------------------------------
@@ -195,6 +213,7 @@ export async function duplicarComponente(
     lightTools: (origem.lightTools ?? []).map((l) => ({ ...l })),
     humanTimeHours: origem.humanTimeHours,
     humanProfile: origem.humanProfile,
+    ...(origem.humanHourlyRate != null ? { humanHourlyRate: origem.humanHourlyRate } : {}),
     unitCost: origem.unitCost,
     version: 1,
     isArchived: false,
@@ -218,6 +237,9 @@ export async function reavaliarComponente(
   lightTools: WithId<LightTool>[],
   settings: WithId<WorkspaceSettings> | null,
 ): Promise<string> {
+  // F1: Reavaliar é a única porta que ignora snapshots — sem passar os
+  // snapshots salvos, tudo resolve para os custos de HOJE (comportamento
+  // previsto no documento de requisitos §5).
   const custo = calcularCustoComposicao(
     {
       supplies: (atual.supplies ?? []).map((l) => ({ supplyId: l.supplyId, quantity: l.quantity })),
@@ -241,6 +263,7 @@ export async function reavaliarComponente(
     lightTools: custo.lightToolLines,
     humanTimeHours: custo.humanTimeHours,
     humanProfile: atual.humanProfile,
+    humanHourlyRate: custo.humanHourlyRate,
     unitCost: custo.unitCost,
     version: atual.version + 1,
     isArchived: false,

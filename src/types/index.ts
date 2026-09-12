@@ -173,6 +173,12 @@ export interface SemiFinishedComponent {
   humanProfile: HumanProfile
   /** Tempo de mão de obra em horas. */
   humanTimeHours: number
+  /**
+   * Snapshot do valor-hora da mão de obra na data da composição (F1:
+   * integridade histórica). Documentos legados não têm — nesse caso o valor
+   * hora das settings é usado como fallback.
+   */
+  humanHourlyRate?: number
   /** Custo unitário calculado (snapshot). */
   unitCost: number
   version: number
@@ -236,6 +242,12 @@ export interface Product {
   lightTools?: ProductLightToolLine[]
   finalHumanTimeHours: number
   finalHumanProfile: HumanProfile
+  /**
+   * Snapshot do valor-hora do acabamento final na data da montagem (F1:
+   * integridade histórica). Documentos legados não têm — nesse caso o valor
+   * hora das settings é usado como fallback.
+   */
+  finalHumanHourlyRate?: number
   directCost: number
   /** Dedução dos materiais leves compartilhados entre componentes/embalagens (contados 1×). */
   lightToolDeduction?: number

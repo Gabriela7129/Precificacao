@@ -48,6 +48,8 @@ const supplyLineSchema = z.object({
   quantity: z.coerce
     .number({ invalid_type_error: 'Obrigatório' })
     .positive('Informe um valor maior que zero'),
+  /** F1: snapshot preservado na edição; null = resolver com custo atual. */
+  unitCostSnapshot: z.number().nullable().optional(),
 })
 
 const machineLineSchema = z.object({
@@ -55,10 +57,14 @@ const machineLineSchema = z.object({
   timeMinutes: z.coerce
     .number({ invalid_type_error: 'Obrigatório' })
     .min(0, 'Não pode ser negativo'),
+  /** F1: snapshot preservado na edição; null = resolver com custo atual. */
+  costPerHourSnapshot: z.number().nullable().optional(),
 })
 
 const lightToolLineSchema = z.object({
   toolId: z.string().min(1, 'Selecione um material leve'),
+  /** F1: snapshot preservado na edição; null = resolver com custo atual. */
+  costPerHourSnapshot: z.number().nullable().optional(),
 })
 
 const componentFormSchema = z.object({
@@ -118,6 +124,7 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
     control,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ComponentFormValues>({
     resolver: zodResolver(componentFormSchema),
@@ -129,13 +136,16 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
           supplies: (componente.supplies ?? []).map((l) => ({
             supplyId: l.supplyId,
             quantity: l.quantity,
+            unitCostSnapshot: l.unitCostSnapshot ?? null,
           })),
           machineAssets: (componente.machineAssets ?? []).map((l) => ({
             assetId: l.assetId,
             timeMinutes: l.timeMinutes,
+            costPerHourSnapshot: l.costPerHourSnapshot ?? null,
           })),
           lightTools: (componente.lightTools ?? []).map((l) => ({
             toolId: l.toolId,
+            costPerHourSnapshot: l.costPerHourSnapshot ?? null,
           })),
           humanProfile: componente.humanProfile,
           humanTimeMinutes: Math.round(componente.humanTimeHours * 60),
@@ -156,22 +166,34 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
   const { fields: lightToolFields, append: appendLightTool, remove: removeLightTool } = useFieldArray({ control, name: 'lightTools' })
   const values = watch()
 
-  // Recálculo ao vivo do painel de custo (sempre com os custos atuais).
+  // F1: na edição, o valor-hora salvo é preservado; trocar o perfil de mão de
+  // obra resolve para o valor hora atual das settings.
+  const savedHumanHourlyRate =
+    isEdit && values.humanProfile === componente.humanProfile
+      ? (componente.humanHourlyRate ?? null)
+      : null
+
+  // Recálculo ao vivo do painel de custo. F1: snapshots salvos são preservados
+  // (edição); linhas novas/entidades trocadas usam os custos atuais.
   const custo = calcularCustoComposicao(
     {
       supplies: (values.supplies ?? []).map((l) => ({
         supplyId: l?.supplyId ?? '',
         quantity: Number(l?.quantity) || 0,
+        unitCostSnapshot: l?.unitCostSnapshot ?? null,
       })),
       machineAssets: (values.machineAssets ?? []).map((l) => ({
         assetId: l?.assetId ?? '',
         timeMinutes: Number(l?.timeMinutes) || 0,
+        costPerHourSnapshot: l?.costPerHourSnapshot ?? null,
       })),
       lightTools: (values.lightTools ?? []).map((l) => ({
         toolId: l?.toolId ?? '',
+        costPerHourSnapshot: l?.costPerHourSnapshot ?? null,
       })),
       humanProfile: values.humanProfile ?? 'operational',
       humanTimeMinutes: Number(values.humanTimeMinutes) || 0,
+      humanHourlyRate: savedHumanHourlyRate,
     },
     supplies,
     heavyAssets,
@@ -179,10 +201,7 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
     settings,
   )
 
-  const humanHourlyRate =
-    values.humanProfile === 'creative'
-      ? (settings?.hourlyCreative ?? 0)
-      : (settings?.hourlyOperational ?? 0)
+  const humanHourlyRate = custo.humanHourlyRate
 
   const onSubmit = handleSubmit(async (formValues) => {
     if (!wsId) return
@@ -195,6 +214,7 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
         lightTools: custo.lightToolLines,
         humanTimeHours: custo.humanTimeHours,
         humanProfile: formValues.humanProfile,
+        humanHourlyRate: custo.humanHourlyRate,
         unitCost: custo.unitCost,
       }
       if (componente) {
@@ -286,7 +306,11 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                 {supplyFields.map((field, index) => {
                   const line = values.supplies?.[index]
                   const supply = supplies.find((s) => s.id === line?.supplyId)
-                  const subtotal = supply ? (Number(line?.quantity) || 0) * supply.averageCost : 0
+                  // F1: subtotal usa o snapshot preservado (edição) ou o custo atual (linha nova).
+                  const effectiveUnitCost = line?.unitCostSnapshot ?? supply?.averageCost
+                  const subtotal = supply != null && effectiveUnitCost != null
+                    ? (Number(line?.quantity) || 0) * effectiveUnitCost
+                    : 0
                   return (
                     <div key={field.id}>
                       <div className="flex gap-3 items-start">
@@ -303,7 +327,11 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                                     label: `${s.name} (${formatBRL(s.averageCost)}/${s.unit})`,
                                   }))}
                                 value={value}
-                                onChange={onChange}
+                                onChange={(next) => {
+                                  // F1: trocar o insumo descarta o snapshot (custo atual será resolvido).
+                                  if (next !== value) setValue(`supplies.${index}.unitCostSnapshot`, null)
+                                  onChange(next)
+                                }}
                                 placeholder="Selecione um insumo"
                               />
                             )}
@@ -365,7 +393,11 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                 {machineFields.map((field, index) => {
                   const line = values.machineAssets?.[index]
                   const asset = heavyAssets.find((a) => a.id === line?.assetId)
-                  const subtotal = asset ? ((line?.timeMinutes || 0) / 60) * asset.totalCostPerHour : 0
+                  // F1: subtotal usa o snapshot preservado (edição) ou o custo atual (linha nova).
+                  const effectiveCostPerHour = line?.costPerHourSnapshot ?? asset?.totalCostPerHour
+                  const subtotal = asset != null && effectiveCostPerHour != null
+                    ? ((Number(line?.timeMinutes) || 0) / 60) * effectiveCostPerHour
+                    : 0
                   return (
                     <div key={field.id}>
                       <div className="flex gap-3 items-start">
@@ -382,7 +414,11 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                                     label: `${a.name} (${formatBRL(a.totalCostPerHour)}/h)`,
                                   }))}
                                 value={value}
-                                onChange={onChange}
+                                onChange={(next) => {
+                                  // F1: trocar o ativo descarta o snapshot (custo atual será resolvido).
+                                  if (next !== value) setValue(`machineAssets.${index}.costPerHourSnapshot`, null)
+                                  onChange(next)
+                                }}
                                 placeholder="Selecione um ativo"
                               />
                             )}
@@ -447,7 +483,8 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                 {lightToolFields.map((field, index) => {
                   const line = values.lightTools?.[index]
                   const tool = lightTools.find((t) => t.id === line?.toolId)
-                  const subtotal = tool?.monthlyMaintenanceCost ?? 0
+                  // F1: subtotal usa o snapshot preservado (edição) ou o custo atual (linha nova).
+                  const subtotal = line?.costPerHourSnapshot ?? tool?.monthlyMaintenanceCost ?? 0
                   return (
                     <div key={field.id}>
                       <div className="flex gap-3 items-start">
@@ -464,7 +501,11 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                                     label: `${t.name} (${formatBRL(t.monthlyMaintenanceCost)})`,
                                   }))}
                                 value={value}
-                                onChange={onChange}
+                                onChange={(next) => {
+                                  // F1: trocar o material descarta o snapshot (custo atual será resolvido).
+                                  if (next !== value) setValue(`lightTools.${index}.costPerHourSnapshot`, null)
+                                  onChange(next)
+                                }}
                                 placeholder="Selecione um material leve"
                               />
                             )}
