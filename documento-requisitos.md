@@ -65,12 +65,13 @@ Hora Criativa = valor hora base × fator (padrão 1,3 a 1,5)
 #### Materiais Leves (Ferramentas de Baixo Valor)
 - Cadastrar individualmente: estiletes, réguas, tesouras, agulhas, etc.
 - **Regra de valor**: itens com valor até **R$ 500,00** vão para materiais leves; acima de R$ 500,00 vão para ativos pesados.
-- **Cálculo híbrido**: o sistema aplica uma taxa percentual (padrão 7%) sobre o valor de cada item cadastrado. Essa taxa é editável.
-- O valor total mensal de manutenção leve é rateado pelas horas produtivas trabalhadas no mês.
+- **Cálculo (modelo vigente — revisão set/2026)**: o sistema aplica uma taxa percentual (padrão 7%) sobre o valor de cada item cadastrado. Essa taxa é editável.
+- Cada material entra como **custo fixo por uso** (manutenção mensal) no componente ou produto em que for utilizado. **Não há rateio por hora produtiva** (modelo anterior, substituído).
+- No produto final, materiais leves repetidos entre componentes/embalagens (ou usados diretamente) são contabilizados **apenas uma vez** — as repetições viram dedução no custo direto.
 - Exemplo:
 ```
 Manutenção mensal do item = valor do item × (taxa / 100)
-Rateio por hora = Σ manutenções mensais / horas produtivas/mês
+Custo do material no componente/produto = manutenção mensal do item (fixo, 1× por uso)
 ```
 
 #### Tarifa de Energia
@@ -404,6 +405,7 @@ Login com Google
 | Tema | Decisão Final |
 |---|---|
 | Valor fixo vs % para manutenção leve | Abordagem híbrida: cadastrar materiais leves individualmente e aplicar % editável sobre o valor. |
+| Modelo de custo do material leve | **Revisão set/2026 (F3):** custo FIXO por uso = manutenção mensal (valor × taxa %). Sem rateio por hora produtiva. No produto, repetições contam 1× (dedução de compartilhamento). |
 | Limite de valor para materiais leves | Até R$ 500,00. Acima disso, ativos pesados. |
 | Sincronização | Sempre online, sem offline-first. |
 | Autenticação | Google Sign-In. |

@@ -17,7 +17,6 @@ import {
   heavyAssetDepreciationPerHour,
   heavyAssetEnergyPerHour,
   heavyAssetTotalCostPerHour,
-  lightMaintenancePerHour,
   lightToolMonthlyMaintenance,
   marketplaceFee,
   monthlyProductiveHours,
@@ -74,20 +73,11 @@ describe('calculadora de valor hora (doc §4, Módulo 1)', () => {
   })
 })
 
-describe('materiais leves (doc §4, Módulo 1)', () => {
-  it('manutenção mensal do item = valor × taxa/100', () => {
+describe('materiais leves (modelo vigente — decisão F3, set/2026)', () => {
+  it('manutenção mensal do item = valor × taxa/100 (custo fixo por uso, sem rateio por hora)', () => {
     // Tesoura R$ 50 × 7% = R$ 3,50
     close(lightToolMonthlyMaintenance(50, 7), 3.5)
     close(lightToolMonthlyMaintenance(50, DEFAULT_LIGHT_MAINTENANCE_RATE), 3.5)
-  })
-
-  it('rateio por hora = Σ manutenções mensais / horas produtivas por mês', () => {
-    // (3,50 + 6,50) / (20h × 4,33) = 10 / 86,6
-    close(lightMaintenancePerHour([3.5, 6.5], 20), 10 / (20 * 4.33))
-  })
-
-  it('rateio é 0 sem horas produtivas (sem divisão por zero)', () => {
-    expect(lightMaintenancePerHour([3.5], 0)).toBe(0)
   })
 })
 

@@ -58,6 +58,13 @@ exibe 70 + 25 = 105 (70+25≠105). O comentário no código afirma a identidade 
 o líquido que quer receber, o sistema calcula o preço de venda").
 
 ### F3 — Material leve: manutenção MENSAL cobrada como custo fixo POR UNIDADE
+**RESOLVIDO (set/2026) — decisão da Gabriela: o modelo VIGENTE é este mesmo.**
+Materiais leves não usam mais rateio por hora produtiva; cada material entra como custo fixo
+(manutenção mensal = valor × taxa %) por uso, com dedução de repetição no produto (conta 1×).
+O documento de requisitos foi atualizado para refletir o modelo vigente; a função
+`lightMaintenancePerHour` e o card "Rateio por hora produtiva" foram removidos.
+---
+**Texto original da auditoria (histórico):**
 Doc §4 (Módulo 1): a manutenção (taxa% × valor) é **rateada pelas horas produtivas do mês**
 ("Rateio por hora = Σ manutenções mensais / horas produtivas/mês").
 Código: `componentUnitCost` (calculations.ts l.158–170) soma a manutenção mensal **inteira** por
@@ -120,7 +127,9 @@ conta, é o débito mais perigoso. *(Endereçado nesta rodada — ver "Testes" a
    comportamento atual e dá rede de segurança para as correções. ✅ feito nesta rodada.
 2. F1 — modelo de snapshot: editar preserva custos; só "Reavaliar" atualiza (remover aviso enganoso).
 3. F2 — breakdown coerente com líquido desejado.
-4. F3 — materiais leves: alinhar rateio com o doc **junto com a Gabriela** (muda preço de venda).
+4. ~~F3 — materiais leves: alinhar rateio com o doc~~ **DECIDIDO (set/2026):** modelo vigente =
+   custo fixo por uso (manutenção mensal = valor × taxa %), sem rateio por hora. Doc e código
+   alinhados; `lightMaintenancePerHour` removida.
 5. F4 — recalcular derivados quando settings mudarem (ou avisar).
 6. (Depois) H1–H6, M1–M8 conforme priorizar com a Gabriela.
 

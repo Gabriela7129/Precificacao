@@ -1,6 +1,8 @@
 /**
  * /materiais-leves — lista e CRUD de Materiais Leves (itens até R$ 500,00).
- * Card de resumo: manutenção mensal total (Σ) e rateio por hora produtiva.
+ * Card de resumo: manutenção mensal total (Σ taxa % sobre o valor dos itens).
+ * Modelo vigente: cada material entra como CUSTO FIXO por uso (manutenção
+ * mensal), sem rateio por hora produtiva — ver AUDITORIA.md F3 (decisão).
  */
 
 import { useMemo, useState } from 'react'
@@ -21,8 +23,8 @@ import {
   THead,
   TR,
 } from '../../components/ui'
-import { DEFAULT_LIGHT_MAINTENANCE_RATE, lightMaintenancePerHour, lightToolMonthlyMaintenance } from '../../lib/calculations'
-import { formatBRL, formatDate } from '../../lib/format'
+import { DEFAULT_LIGHT_MAINTENANCE_RATE, lightToolMonthlyMaintenance } from '../../lib/calculations'
+import { formatBRL, formatDate, formatPercent } from '../../lib/format'
 import { deleteLightTool, useActiveWorkspaceId, useLightTools, createLightTool } from '../../services/firestore'
 import type { LightTool, WithId } from '../../types'
 import { useWorkspaceSettings } from './data'
@@ -43,7 +45,6 @@ export function MateriaisLevesPage() {
 
   const loading = toolsLoading || settingsLoading
   const maintenanceRate = settings?.lightMaintenanceRate ?? DEFAULT_LIGHT_MAINTENANCE_RATE
-  const productiveHoursPerWeek = settings?.productiveHoursPerWeek ?? 0
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -55,10 +56,6 @@ export function MateriaisLevesPage() {
   const totalMonthlyMaintenance = useMemo(
     () => tools.reduce((sum, tool) => sum + (tool.monthlyMaintenanceCost ?? 0), 0),
     [tools],
-  )
-  const maintenancePerHour = lightMaintenancePerHour(
-    tools.map((tool) => tool.monthlyMaintenanceCost ?? 0),
-    productiveHoursPerWeek,
   )
 
   const openCreate = () => {
@@ -158,31 +155,23 @@ export function MateriaisLevesPage() {
         <EmptyState
           icon={Scissors}
           title="Nenhum material leve cadastrado"
-          description="Cadastre estiletes, réguas, tesouras e agulhas para ratear a manutenção na hora trabalhada."
+          description="Cadastre estiletes, réguas, tesouras e agulhas. Cada material entra com custo fixo (taxa % de manutenção mensal sobre o valor pago)."
           actionLabel="+ Novo material"
           onAction={openCreate}
         />
       ) : (
         <>
           <Card className="mb-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm text-gray-500">Manutenção mensal total</p>
-                <p className="text-xl font-bold text-rose-500 mt-1">
-                  {formatBRL(totalMonthlyMaintenance)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Rateio por hora produtiva</p>
-                <p className="text-xl font-bold text-rose-500 mt-1">
-                  {formatBRL(maintenancePerHour)}
-                </p>
-                {productiveHoursPerWeek <= 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Configure suas horas produtivas em Configurações para calcular o rateio.
-                  </p>
-                )}
-              </div>
+            <div>
+              <p className="text-sm text-gray-500">Manutenção mensal total</p>
+              <p className="text-xl font-bold text-rose-500 mt-1">
+                {formatBRL(totalMonthlyMaintenance)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Soma da taxa de {formatPercent(maintenanceRate)} aplicada sobre o valor de cada
+                material. Esse valor entra como custo fixo quando o material é usado em um
+                componente ou produto — sem rateio por hora.
+              </p>
             </div>
           </Card>
 

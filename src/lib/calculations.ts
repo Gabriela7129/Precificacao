@@ -66,16 +66,10 @@ export function lightToolMonthlyMaintenance(purchaseValue: number, maintenanceRa
   return purchaseValue * (maintenanceRatePct / 100)
 }
 
-/** Rateio por hora = Σ manutenções mensais / horas produtivas/mês */
-export function lightMaintenancePerHour(
-  monthlyMaintenanceCosts: number[],
-  productiveHoursPerWeek: number,
-): number {
-  const total = monthlyMaintenanceCosts.reduce((sum, c) => sum + c, 0)
-  const hours = monthlyProductiveHours(productiveHoursPerWeek)
-  if (hours <= 0) return 0
-  return total / hours
-}
+// Modelo vigente (decisão F3, set/2026): materiais leves NÃO usam rateio por
+// hora produtiva. Cada material entra como custo fixo por uso
+// (manutenção mensal = valor × taxa %), contado 1× por produto via dedução
+// de compartilhamento. A antiga lightMaintenancePerHour foi removida.
 
 // ---------------------------------------------------------------------------
 // Ativos pesados (Módulo 2)
