@@ -233,9 +233,15 @@ export function priceWithoutFees(directCost: number, profitMarginPct: number): n
 // Marketplace — taxas e cálculo reverso
 // ---------------------------------------------------------------------------
 
-/** Taxa total cobrada pelo marketplace sobre um preço de venda. */
+/**
+ * Taxa total cobrada pelo marketplace sobre um preço de venda.
+ * Modelo (decisão set/2026): a taxa % incide sobre o preço SEM a taxa fixa;
+ * a taxa fixa é somada POR FORA (a porcentagem não incide sobre ela).
+ * taxa = (preço de venda − taxa fixa) × %/100 + taxa fixa
+ */
 export function marketplaceFee(salePrice: number, feePercentage: number, fixedFee: number | null = null): number {
-  return salePrice * (feePercentage / 100) + (fixedFee ?? 0)
+  const fixed = fixedFee ?? 0
+  return (salePrice - fixed) * (feePercentage / 100) + fixed
 }
 
 /** Valor líquido recebido = preço de venda − taxas do marketplace. */
@@ -250,8 +256,13 @@ export function netValueFromSalePrice(
 /**
  * Cálculo reverso: valor líquido desejado → preço de venda.
  *
- * líquido = preço × (1 − taxa/100) − taxa fixa
- * preço = (líquido + taxa fixa) / (1 − taxa/100)
+ * Modelo (decisão set/2026): a porcentagem é aplicada "por dentro" sobre o
+ * líquido e a taxa fixa é SOMADA DEPOIS, sem a porcentagem incidir sobre ela:
+ *
+ * preço = líquido / (1 − taxa%/100) + taxa fixa
+ *
+ * Assim: preço − taxaFixa = líquido/(1−taxa%) e o marketplace cobra
+ * taxa% sobre (preço − taxaFixa) + taxaFixa, devolvendo exatamente o líquido.
  */
 export function salePriceFromDesiredNet(
   desiredNetValue: number,
@@ -260,5 +271,5 @@ export function salePriceFromDesiredNet(
 ): number {
   const rate = 1 - feePercentage / 100
   if (rate <= 0) return 0
-  return (desiredNetValue + (fixedFee ?? 0)) / rate
+  return desiredNetValue / rate + (fixedFee ?? 0)
 }

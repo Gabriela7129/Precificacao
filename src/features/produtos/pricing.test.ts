@@ -1,10 +1,14 @@
 /**
  * Testes de `computePricing` — camada de precificação do produto.
  *
- * Inclui testes de CARACTERIZAÇÃO dos desvios apontados na auditoria
- * (AUDITORIA.md): eles documentam o comportamento ATUAL do código, não o
- * desejado. Quando F2/M4/M6 forem corrigidos, estes testes devem ser
- * atualizados de propósito (o comentário indica qual achado cada um cobre).
+ * Modelo de taxa (decisão set/2026): a porcentagem incide "por dentro" sobre o
+ * líquido e a taxa fixa é SOMADA DEPOIS (a % não incide sobre a fixa):
+ *   preço = líquido / (1 − %/100) + taxa fixa
+ *   taxa  = (preço − taxa fixa) × %/100 + taxa fixa
+ *
+ * F2 (corrigido): com líquido desejado, `precoSemTaxas` É o líquido desejado —
+ * a identidade do breakdown (preço sem taxas + taxa = preço de venda) fecha em
+ * todos os caminhos. M4/M6 seguem caracterizados (comportamento atual).
  */
 import { describe, expect, it } from 'vitest'
 import { computePricing } from './pricing'
@@ -34,11 +38,12 @@ describe('computePricing — caminho padrão (sem líquido desejado)', () => {
     close(r.salePrice - r.taxaMarketplace, r.precoSemTaxas)
   })
 
-  it('marketplace com taxa fixa (Shopee): (70 + 4) / 0,8 = 92,50', () => {
+  it('marketplace com taxa fixa (Shopee): 70/0,8 + 4 = 91,50 (fixa somada DEPOIS da %)', () => {
     const r = computePricing({ directCost: 50, profitMargin: 40, marketplace: shopee, desiredNetValue: null })
-    close(r.salePrice, 92.5)
-    close(r.taxaMarketplace, 22.5) // 92,50 × 20% + 4
-    close(r.salePrice - r.taxaMarketplace, r.precoSemTaxas)
+    close(r.salePrice, 91.5)
+    // taxa = (91,50 − 4) × 20% + 4 = 21,50 — a % NÃO incide sobre a taxa fixa.
+    close(r.taxaMarketplace, 21.5)
+    close(r.salePrice - r.taxaMarketplace, r.precoSemTaxas) // líquido = 70 ✓
   })
 
   it('Nuvemshop 1%: 70 / 0,99', () => {
@@ -59,22 +64,20 @@ describe('computePricing — caminho padrão (sem líquido desejado)', () => {
 })
 
 describe('computePricing — líquido desejado (cálculo reverso, doc §5)', () => {
-  it('líquido desejado + marketplace: preço = (líquido + taxa fixa) / (1 − %/100)', () => {
-    // (80 + 4) / 0,8 = 105 — o líquido desejado vence a margem como base.
+  it('líquido desejado + marketplace: preço = líquido / (1 − %/100) + taxa fixa', () => {
+    // 80/0,8 + 4 = 104 — o líquido desejado vence a margem como base.
     const r = computePricing({ directCost: 50, profitMargin: 40, marketplace: shopee, desiredNetValue: 80 })
-    close(r.salePrice, 105)
-    close(r.taxaMarketplace, 25) // 105 × 20% + 4
+    close(r.salePrice, 104)
+    close(r.taxaMarketplace, 24) // (104 − 4) × 20% + 4
     close(r.salePrice - r.taxaMarketplace, 80) // líquido real = o desejado ✓
+    close(r.precoSemTaxas, 80) // F2: preço sem taxas É o líquido desejado
   })
 
-  // AUDITORIA F2: com líquido desejado, o breakdown exibido não fecha —
-  // precoSemTaxas (derivado da margem) + taxaMarketplace ≠ salePrice (derivado
-  // do líquido). Este teste CARACTERIZA o desvio: 70 + 25 ≠ 105 (diferença 10).
-  it('[F2 caracterização] breakdown não fecha: preço sem taxas + taxa ≠ preço de venda', () => {
+  // F2 CORRIGIDO: a identidade do breakdown agora fecha também com líquido
+  // desejado — precoSemTaxas (= o líquido) + taxaMarketplace = salePrice.
+  it('[F2 corrigido] breakdown fecha: preço sem taxas + taxa = preço de venda', () => {
     const r = computePricing({ directCost: 50, profitMargin: 40, marketplace: shopee, desiredNetValue: 80 })
-    const soma = r.precoSemTaxas + r.taxaMarketplace
-    expect(Math.abs(soma - r.salePrice)).toBeGreaterThan(1e-9) // 95 ≠ 105
-    close(soma - r.salePrice, -10)
+    close(r.precoSemTaxas + r.taxaMarketplace, r.salePrice) // 80 + 24 = 104 ✓
   })
 
   // AUDITORIA M6: líquido desejado SEM marketplace é ignorado silenciosamente —

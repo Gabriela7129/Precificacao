@@ -10,9 +10,15 @@ import {
 import type { Marketplace } from '../../types'
 
 export interface PricingResult {
-  /** Margem de lucro em R$ (preço sem taxas − custo direto). */
+  /** Margem de lucro em R$ sobre o custo direto (base efetiva − custo direto). */
   margemValor: number
-  /** Preço sem taxas = custo direto × (1 + margem/100). */
+  /**
+   * Preço sem taxas = base líquida efetiva do cálculo (F2).
+   * Sem líquido desejado: custo direto × (1 + margem/100).
+   * Com líquido desejado + marketplace: o próprio líquido desejado — assim a
+   * identidade do breakdown (preço sem taxas + taxa = preço de venda) fecha
+   * em todos os caminhos, e o líquido É o preço sem taxas.
+   */
   precoSemTaxas: number
   /** Taxa total do marketplace sobre o preço de venda (R$). */
   taxaMarketplace: number
@@ -22,13 +28,17 @@ export interface PricingResult {
 
 /**
  * Regra: preço de venda = preço sem taxas + taxa do marketplace.
- * A taxa percentual incide sobre o preço de venda, de modo que
- * preço de venda − taxa = preço sem taxas (o líquido É o preço sem taxas —
- * por isso não há linha de "valor líquido" no breakdown).
+ * Modelo de taxa (decisão set/2026): a porcentagem incide "por dentro" sobre
+ * o líquido (preço sem taxas) e a taxa fixa é SOMADA DEPOIS, sem a
+ * porcentagem incidir sobre ela:
+ *   preço = líquido / (1 − taxa%/100) + taxa fixa
+ *   taxa  = (preço − taxa fixa) × taxa%/100 + taxa fixa
+ * Com isso preço − taxa = líquido (o líquido É o preço sem taxas — sem linha
+ * separada no breakdown).
  *
- * Com `desiredNetValue` preenchido E marketplace selecionado, o líquido
- * desejado substitui o preço sem taxas como base do cálculo reverso:
- * preço = (líquido + taxaFixa) / (1 − taxa%/100).
+ * F2: com `desiredNetValue` preenchido E marketplace selecionado, o líquido
+ * desejado substitui o preço-da-margem como base — e é ele que aparece como
+ * "preço sem taxas" no breakdown, mantendo a identidade visível.
  */
 export function computePricing(args: {
   directCost: number
@@ -37,27 +47,25 @@ export function computePricing(args: {
   desiredNetValue: number | null
 }): PricingResult {
   const { directCost, profitMargin, marketplace, desiredNetValue } = args
-  const precoSemTaxas = priceWithoutFees(directCost, profitMargin)
+  const precoMargem = priceWithoutFees(directCost, profitMargin)
   const feePct = marketplace?.feePercentage ?? 0
   const fixedFee = marketplace?.fixedFee ?? null
 
-  // Base sobre a qual a taxa do marketplace é aplicada.
-  const base = desiredNetValue != null && marketplace ? desiredNetValue : precoSemTaxas
+  // Base líquida efetiva: líquido desejado vence a margem (com marketplace).
+  const base = desiredNetValue != null && marketplace ? desiredNetValue : precoMargem
 
   let salePrice: number
   if (marketplace) {
-    // preço de venda = base + taxa; como a taxa % incide sobre o preço de
-    // venda, resolve-se por: (base + taxaFixa) / (1 − taxa%/100).
     salePrice = salePriceFromDesiredNet(base, feePct, fixedFee)
   } else {
-    salePrice = precoSemTaxas
+    salePrice = base
   }
 
   const taxaMarketplace = marketplace ? marketplaceFee(salePrice, feePct, fixedFee) : 0
 
   return {
-    margemValor: precoSemTaxas - directCost,
-    precoSemTaxas,
+    margemValor: base - directCost,
+    precoSemTaxas: base,
     taxaMarketplace,
     salePrice,
   }

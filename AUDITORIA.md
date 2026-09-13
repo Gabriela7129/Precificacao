@@ -49,6 +49,13 @@ sem pedir. Pior: a UI diz "Valor atual: X — **atualize se quiser** usar o novo
 **Correção na visão original:** editar preserva snapshots salvos; reavaliar é o único caminho que atualiza custos.
 
 ### F2 — Breakdown não fecha com "líquido desejado"
+**RESOLVIDO (set/2026):** `precoSemTaxas` agora É a base líquida efetiva (líquido desejado, quando
+preenchido com marketplace) — a identidade preço sem taxas + taxa = preço de venda fecha em todos
+os caminhos. Junto, por decisão da Gabriela, o modelo da taxa fixa mudou: a % incide "por dentro"
+sobre o líquido e a taxa fixa é SOMADA DEPOIS (a % não incide sobre ela):
+`preço = líquido/(1 − %/100) + taxaFixa` · `taxa = (preço − taxaFixa) × %/100 + taxaFixa`.
+---
+**Texto original da auditoria (histórico):**
 `pricing.ts` l.45: com `desiredNetValue` + marketplace, o preço de venda é calculado a partir do
 líquido desejado, mas o breakdown (`PricingBreakdown.tsx`) exibe `precoSemTaxas` (derivado da
 margem) + `taxaMarketplace` = `salePrice` — identidade que **não vale** nesse caso.
@@ -126,7 +133,9 @@ conta, é o débito mais perigoso. *(Endereçado nesta rodada — ver "Testes" a
 1. **Testes nas funções puras** (`calculations.ts`, `pricing.ts`, `format.ts`) — trava o
    comportamento atual e dá rede de segurança para as correções. ✅ feito nesta rodada.
 2. F1 — modelo de snapshot: editar preserva custos; só "Reavaliar" atualiza (remover aviso enganoso).
-3. F2 — breakdown coerente com líquido desejado.
+3. ~~F2 — breakdown coerente com líquido desejado~~ **CORRIGIDO (set/2026):** precoSemTaxas = base
+   líquida efetiva; identidade do breakdown fecha em todos os caminhos. Modelo da taxa fixa
+   ajustado: % por dentro, fixa somada depois (decisão da Gabriela).
 4. ~~F3 — materiais leves: alinhar rateio com o doc~~ **DECIDIDO (set/2026):** modelo vigente =
    custo fixo por uso (manutenção mensal = valor × taxa %), sem rateio por hora. Doc e código
    alinhados; `lightMaintenancePerHour` removida.

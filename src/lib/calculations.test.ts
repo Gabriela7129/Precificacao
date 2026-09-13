@@ -202,19 +202,20 @@ describe('margem e taxas (doc §4, Módulo 5)', () => {
     close(priceWithoutFees(50, 0), 50)
   })
 
-  it('taxa do marketplace = preço × %/100 + taxa fixa', () => {
-    close(marketplaceFee(100, 20, 4), 24)
+  it('taxa do marketplace = (preço − taxa fixa) × %/100 + taxa fixa (% não incide sobre a fixa)', () => {
+    close(marketplaceFee(100, 20, 4), (100 - 4) * 0.2 + 4) // 23,20
     close(marketplaceFee(100, 20), 20)
     close(marketplaceFee(100, 1, null), 1)
   })
 
   it('líquido = preço de venda − taxas', () => {
-    close(netValueFromSalePrice(92.5, 20, 4), 92.5 - 22.5)
+    // 92,50 − ((92,50 − 4) × 20% + 4) = 92,50 − 21,70 = 70,80
+    close(netValueFromSalePrice(92.5, 20, 4), 92.5 - ((92.5 - 4) * 0.2 + 4))
   })
 
-  it('cálculo reverso: preço = (líquido + taxa fixa) / (1 − %/100)', () => {
-    // líquido R$ 80 na Shopee (20% + R$ 4) → (80 + 4) / 0,8 = 105
-    close(salePriceFromDesiredNet(80, 20, 4), 105)
+  it('cálculo reverso: preço = líquido / (1 − %/100) + taxa fixa (fixa somada DEPOIS)', () => {
+    // líquido R$ 80 na Shopee (20% + R$ 4) → 80/0,8 + 4 = 104
+    close(salePriceFromDesiredNet(80, 20, 4), 104)
     close(salePriceFromDesiredNet(80, 20), 100)
   })
 
