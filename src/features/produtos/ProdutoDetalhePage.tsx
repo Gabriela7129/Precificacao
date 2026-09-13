@@ -10,6 +10,7 @@ import { FieldLabel, Select } from '../../components/ui/Input'
 import { PercentInput } from '../../components/ui/PercentInput'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { productDirectCost } from '../../lib/calculations'
+import { hasFeeTiers } from '../../lib/marketplaceTiers'
 import { formatBRL, formatDate, formatMinutes, formatPercent } from '../../lib/format'
 import {
   createProduct,
@@ -528,8 +529,11 @@ export function ProdutoDetalhePage() {
                   <option value="">Selecione um marketplace</option>
                   {marketplaces.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name} ({formatPercent(m.feePercentage)}
-                      {m.fixedFee ? ` + ${formatBRL(m.fixedFee)}` : ''})
+                      {m.name} (
+                      {hasFeeTiers(m)
+                        ? 'taxa por valor'
+                        : `${formatPercent(m.feePercentage)}${m.fixedFee ? ` + ${formatBRL(m.fixedFee)}` : ''}`}
+                      )
                     </option>
                   ))}
                 </Select>

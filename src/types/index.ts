@@ -125,13 +125,30 @@ export interface SupplyEntry {
 // ---------------------------------------------------------------------------
 // marketplaces
 // ---------------------------------------------------------------------------
+/** Faixa de taxa por valor do produto na plataforma (toggle "Taxa por valor"). */
+export interface MarketplaceFeeTier {
+  /** Valor mínimo da faixa (R$), inclusive. null = sem limite inferior. */
+  minValue: number | null
+  /** Valor máximo da faixa (R$), inclusive. null = sem limite superior. */
+  maxValue: number | null
+  /** Taxa percentual da faixa (ex.: 20 = 20%). */
+  feePercentage: number
+  /** Taxa fixa da faixa em R$. null = sem taxa fixa. */
+  fixedFee: number | null
+}
+
 export interface Marketplace {
   workspaceId: string
   name: string
-  /** Taxa percentual (ex.: 20 = 20%). */
+  /** Taxa percentual (ex.: 20 = 20%). Com `feeTiers` ativo, espelha a primeira faixa (compat). */
   feePercentage: number
   /** Taxa fixa em R$ (ex.: 4). `null`/ausente = sem taxa fixa. */
   fixedFee: number | null
+  /**
+   * Faixas de taxa por valor de venda. Quando presente e não vazio, o cálculo
+   * usa a faixa coerente com o PREÇO DE VENDA (não com o preço sem taxas).
+   */
+  feeTiers?: MarketplaceFeeTier[] | null
   isDefault: boolean
 }
 

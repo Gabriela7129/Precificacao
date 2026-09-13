@@ -5,9 +5,9 @@
 import {
   marketplaceFee,
   priceWithoutFees,
-  salePriceFromDesiredNet,
 } from '../../lib/calculations'
-import type { Marketplace } from '../../types'
+import { resolveSalePriceFromBase } from '../../lib/marketplaceTiers'
+import type { Marketplace, MarketplaceFeeTier } from '../../types'
 
 export interface PricingResult {
   /**
@@ -30,6 +30,13 @@ export interface PricingResult {
   modoReverso: boolean
   /** Preço sem taxas derivado da margem % (referência no modo reverso). */
   precoSemTaxasMargem: number
+  /** Marketplace com "Taxa por valor": faixa usada no cálculo (null = sem faixas). */
+  feeTier: MarketplaceFeeTier | null
+  /**
+   * true quando o preço de venda não cai em nenhuma faixa configurada — a
+   * taxa usada é a da faixa mais próxima e a UI deve avisar o usuário.
+   */
+  feeOutOfRange: boolean
 }
 
 /**
@@ -42,6 +49,12 @@ export interface PricingResult {
  * Com isso preço − taxa = líquido (o líquido É o preço sem taxas — sem linha
  * separada no breakdown).
  *
+ * Taxa por valor (faixas): quando o marketplace tem `feeTiers`, a faixa é
+ * escolhida pelo PREÇO DE VENDA (o valor do item na plataforma), não pelo
+ * preço sem taxas — resolve-se por auto-consistência em `marketplaceTiers.ts`.
+ * Ex.: produto com base R$ 75 pela faixa até R$ 79,99 daria preço R$ 80+;
+ * como 80 já cai na faixa seguinte, a taxa usada é a da faixa R$ 80–99,99.
+ *
  * A base é o preço sem taxas (custo × (1 + margem/100)); com
  * `desiredNetValue` preenchido E marketplace selecionado, o líquido desejado
  * substitui essa base (modo reverso, F2) e passa a ser o preço sem taxas
@@ -50,26 +63,23 @@ export interface PricingResult {
 export function computePricing(args: {
   directCost: number
   profitMargin: number
-  marketplace: Pick<Marketplace, 'feePercentage' | 'fixedFee'> | null | undefined
+  marketplace: Pick<Marketplace, 'feePercentage' | 'fixedFee' | 'feeTiers'> | null | undefined
   desiredNetValue: number | null
 }): PricingResult {
   const { directCost, profitMargin, marketplace, desiredNetValue } = args
   const precoSemTaxasMargem = priceWithoutFees(directCost, profitMargin)
-  const feePct = marketplace?.feePercentage ?? 0
-  const fixedFee = marketplace?.fixedFee ?? null
 
   // Base líquida efetiva: líquido desejado vence a margem (com marketplace).
   const modoReverso = desiredNetValue != null && marketplace != null
   const base = modoReverso ? (desiredNetValue as number) : precoSemTaxasMargem
 
-  let salePrice: number
-  if (marketplace) {
-    salePrice = salePriceFromDesiredNet(base, feePct, fixedFee)
-  } else {
-    salePrice = base
-  }
+  const { salePrice, resolved } = marketplace
+    ? resolveSalePriceFromBase(marketplace, base)
+    : { salePrice: base, resolved: null }
 
-  const taxaMarketplace = marketplace ? marketplaceFee(salePrice, feePct, fixedFee) : 0
+  const taxaMarketplace = resolved
+    ? marketplaceFee(salePrice, resolved.feePercentage, resolved.fixedFee)
+    : 0
 
   return {
     margemValor: base - directCost,
@@ -78,5 +88,7 @@ export function computePricing(args: {
     salePrice,
     modoReverso,
     precoSemTaxasMargem,
+    feeTier: resolved?.tier ?? null,
+    feeOutOfRange: resolved?.outOfRange ?? false,
   }
 }

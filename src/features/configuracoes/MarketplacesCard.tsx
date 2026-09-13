@@ -8,13 +8,26 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { deleteMarketplace, useMarketplaces, useProducts } from '../../services/firestore'
 import { formatBRL, formatPercent } from '../../lib/format'
-import type { Marketplace, WithId } from '../../types'
+import { hasFeeTiers } from '../../lib/marketplaceTiers'
+import type { Marketplace, MarketplaceFeeTier, WithId } from '../../types'
 import { MarketplaceFormModal } from './MarketplaceFormModal'
+
+function tierRange(t: MarketplaceFeeTier): string {
+  const min = t.minValue != null ? formatBRL(t.minValue) : 'R$ 0'
+  const max = t.maxValue != null ? formatBRL(t.maxValue) : 'sem limite'
+  return `${min} a ${max}`
+}
 
 /** "Taxa: 20% + R$ 4,00" */
 function feeLabel(m: Marketplace): string {
   const parts = [`Taxa: ${formatPercent(m.feePercentage)}`]
   if (m.fixedFee != null && m.fixedFee > 0) parts.push(`+ ${formatBRL(m.fixedFee)}`)
+  return parts.join(' ')
+}
+
+function tierFeeLabel(t: MarketplaceFeeTier): string {
+  const parts = [formatPercent(t.feePercentage)]
+  if (t.fixedFee != null && t.fixedFee > 0) parts.push(`+ ${formatBRL(t.fixedFee)}`)
   return parts.join(' ')
 }
 
@@ -95,8 +108,19 @@ export function MarketplacesCard({ wsId }: { wsId: string }) {
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-medium text-gray-900 truncate">{m.name}</span>
                 {m.isDefault && <Badge variant="default">Padrão</Badge>}
+                {hasFeeTiers(m) && <Badge variant="amber">Taxa por valor</Badge>}
               </div>
-              <p className="text-sm text-gray-600">{feeLabel(m)}</p>
+              {hasFeeTiers(m) ? (
+                <div className="space-y-1">
+                  {(m.feeTiers ?? []).map((t, i) => (
+                    <p key={i} className="text-xs text-gray-600">
+                      {tierRange(t)} · {tierFeeLabel(t)}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600">{feeLabel(m)}</p>
+              )}
               <div className="flex gap-3 mt-3">
                 <Button variant="ghost" className="text-xs px-0" onClick={() => openEdit(m)}>
                   Editar
