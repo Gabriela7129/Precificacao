@@ -3,12 +3,12 @@ import { Badge } from '../../../components/ui/Badge'
 import { Card } from '../../../components/ui/Card'
 import { priceWithoutFees } from '../../../lib/calculations'
 import { formatBRL, formatDate, formatPercent } from '../../../lib/format'
-import type { Product, WithId } from '../../../types'
+import type { Marketplace, Product, WithId } from '../../../types'
 
 export interface ProductCardProps {
   product: WithId<Product>
-  /** Nome do marketplace selecionado (para o rótulo do preço de venda). */
-  marketplaceName?: string | null
+  /** Marketplace selecionado (rótulo do preço de venda + base do modo reverso, F2). */
+  marketplace?: WithId<Marketplace> | null
   archived?: boolean
   onClick: () => void
   /** Duplicar produto (ausente = sem botão). */
@@ -21,17 +21,23 @@ export interface ProductCardProps {
 /**
  * Card canônico de produto (design.md 5.10/5.11): título + meta + badge,
  * linhas Custo direto / Margem / Preço sem taxas e destaque Preço de venda.
+ *
+ * F2: o "Preço sem taxas" usa a mesma base do detalhe — no modo reverso
+ * (líquido desejado + marketplace) é o líquido desejado, não o preço derivado
+ * da margem %.
  */
 export function ProductCard({
   product,
-  marketplaceName,
+  marketplace = null,
   archived = false,
   onClick,
   onDuplicate,
   duplicating = false,
   onDelete,
 }: ProductCardProps) {
-  const precoSemTaxas = priceWithoutFees(product.directCost, product.profitMargin)
+  const precoMargem = priceWithoutFees(product.directCost, product.profitMargin)
+  const modoReverso = product.desiredNetValue != null && marketplace != null
+  const precoSemTaxas = modoReverso ? (product.desiredNetValue as number) : precoMargem
   const asTimestamp = (value: unknown) => value as { toDate: () => Date } | undefined
   const meta = archived
     ? `v${product.version} · arquivado em ${formatDate(asTimestamp(product.updatedAt))}`
@@ -92,7 +98,7 @@ export function ProductCard({
         </div>
         <div className="flex justify-between items-end border-t border-rose-100 pt-2 mt-2">
           <span className="text-gray-600">
-            Preço de venda{marketplaceName ? ` · ${marketplaceName}` : ''}
+            Preço de venda{marketplace ? ` · ${marketplace.name}` : ''}
           </span>
           <span className="text-xl font-bold text-rose-500">{formatBRL(product.salePrice)}</span>
         </div>

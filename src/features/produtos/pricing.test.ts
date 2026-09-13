@@ -67,18 +67,28 @@ describe('computePricing — líquido desejado (cálculo reverso, doc §5)', () 
     close(r.salePrice - r.taxaMarketplace, 80) // líquido real = o desejado ✓
   })
 
-  // AUDITORIA F2: com líquido desejado, o breakdown exibido não fecha —
-  // precoSemTaxas (derivado da margem) + taxaMarketplace ≠ salePrice (derivado
-  // do líquido). Este teste CARACTERIZA o desvio: 70 + 25 ≠ 105 (diferença 10).
-  it('[F2 caracterização] breakdown não fecha: preço sem taxas + taxa ≠ preço de venda', () => {
+  // F2 CORRIGIDO: o preço sem taxas passa a ser a base real do cálculo (o
+  // líquido desejado) e a margem exibida é a efetiva — o breakdown fecha.
+  // (Antes: exibia precoSemTaxas da margem (70) + taxa (25) ≠ salePrice (105).)
+  it('[F2 corrigido] breakdown fecha no modo reverso: preço sem taxas + taxa = preço de venda', () => {
     const r = computePricing({ directCost: 50, profitMargin: 40, marketplace: shopee, desiredNetValue: 80 })
-    const soma = r.precoSemTaxas + r.taxaMarketplace
-    expect(Math.abs(soma - r.salePrice)).toBeGreaterThan(1e-9) // 95 ≠ 105
-    close(soma - r.salePrice, -10)
+    expect(r.modoReverso).toBe(true)
+    close(r.precoSemTaxas, 80) // a base real, não os 70 da margem
+    close(r.margemValor, 30) // margem efetiva: 80 − 50
+    close(r.precoSemTaxasMargem, 70) // referência preservada para a nota da UI
+    close(r.precoSemTaxas + r.taxaMarketplace, r.salePrice) // 80 + 25 = 105 ✓
   })
 
-  // AUDITORIA M6: líquido desejado SEM marketplace é ignorado silenciosamente —
-  // o preço segue sendo custo × (1 + margem), sem nenhum aviso.
+  it('modo reverso só ativa com líquido desejado E marketplace', () => {
+    const semMarketplace = computePricing({ directCost: 50, profitMargin: 40, marketplace: null, desiredNetValue: 80 })
+    expect(semMarketplace.modoReverso).toBe(false)
+    const semLiquido = computePricing({ directCost: 50, profitMargin: 40, marketplace: shopee, desiredNetValue: null })
+    expect(semLiquido.modoReverso).toBe(false)
+    close(semLiquido.precoSemTaxas, 70) // caminho normal: base da margem
+  })
+
+  // AUDITORIA M6: líquido desejado SEM marketplace segue ignorado
+  // silenciosamente (sem aviso). O F2 não muda isso — decisão de escopo.
   it('[M6 caracterização] líquido desejado sem marketplace é ignorado', () => {
     const r = computePricing({ directCost: 50, profitMargin: 40, marketplace: null, desiredNetValue: 80 })
     close(r.salePrice, 70) // igual ao caso sem desiredNetValue

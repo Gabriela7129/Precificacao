@@ -12,7 +12,7 @@ export function ProdutosArquivadosPage() {
   const { data: products, loading } = useProducts()
   const { data: marketplaces } = useMarketplaces()
 
-  const marketplacesById = useMemo(() => new Map(marketplaces.map((m) => [m.id, m.name])), [marketplaces])
+  const marketplacesById = useMemo(() => new Map(marketplaces.map((m) => [m.id, m])), [marketplaces])
   const archivedProducts = useMemo(
     () =>
       products
@@ -53,7 +53,7 @@ export function ProdutosArquivadosPage() {
             <ProductCard
               key={p.id}
               product={p}
-              marketplaceName={p.marketplaceId ? (marketplacesById.get(p.marketplaceId) ?? null) : null}
+              marketplace={p.marketplaceId ? (marketplacesById.get(p.marketplaceId) ?? null) : null}
               archived
               onClick={() => navigate(`/produtos/${p.id}`)}
             />

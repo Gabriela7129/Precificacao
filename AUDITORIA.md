@@ -39,7 +39,7 @@ rodada.**
 
 ## 🔴 Achados críticos
 
-### F1 — Editar re-snapshot tudo silenciosamente (viola "Integridade Histórica" §5)
+### F1 — Editar re-snapshot tudo silenciosamente (viola "Integridade Histórica" §5) ✅ RESOLVIDO (PR #1)
 O requisito: alterações futuras de custos **não** alteram produtos já finalizados; só "Reavaliar" faz isso.
 O código: em `ProdutoFormPage.tsx` (onSubmit, l.216–234) e `ComponenteFormPage.tsx` (l.187–204),
 o save persiste o cálculo **live** (`live.*` / `custo.*`), que usa sempre o custo ATUAL de cada
@@ -48,14 +48,16 @@ sem pedir. Pior: a UI diz "Valor atual: X — **atualize se quiser** usar o novo
 (l.334, 414, 494, 579, 662) — mas o save aplica o novo custo **sempre**.
 **Correção na visão original:** editar preserva snapshots salvos; reavaliar é o único caminho que atualiza custos.
 
-### F2 — Breakdown não fecha com "líquido desejado"
+### F2 — Breakdown não fecha com "líquido desejado" ✅ RESOLVIDO (PR #2)
 `pricing.ts` l.45: com `desiredNetValue` + marketplace, o preço de venda é calculado a partir do
-líquido desejado, mas o breakdown (`PricingBreakdown.tsx`) exibe `precoSemTaxas` (derivado da
-margem) + `taxaMarketplace` = `salePrice` — identidade que **não vale** nesse caso.
+líquido desejado, mas o breakdown (`PricingBreakdown.tsx`) exibia `precoSemTaxas` (derivado da
+margem) + `taxaMarketplace` = `salePrice` — identidade que **não valia** nesse caso.
 Caso real verificado: custo R$50, margem 40%, Shopee 20%+R$4, líquido R$80 →
-exibe 70 + 25 = 105 (70+25≠105). O comentário no código afirma a identidade como se fosse geral.
-**Correção na visão original:** o breakdown deve refletir a base real do cálculo (§5: "usuário informa
-o líquido que quer receber, o sistema calcula o preço de venda").
+exibia 70 + 25 = 105 (70+25≠105).
+**Corrigido (opção A):** no modo reverso o preço sem taxas É a base real (o líquido desejado —
+coerente com §8: "preço mínimo fora das plataformas"); a linha Margem mostra a margem efetiva
+com nota "calculada a partir do líquido desejado" e a referência da margem % aparece abaixo do
+preço sem taxas. `ProductCard` estendido para a mesma base. Identidade fecha sempre.
 
 ### F3 — Material leve: manutenção MENSAL cobrada como custo fixo POR UNIDADE
 Doc §4 (Módulo 1): a manutenção (taxa% × valor) é **rateada pelas horas produtivas do mês**
@@ -117,9 +119,9 @@ conta, é o débito mais perigoso. *(Endereçado nesta rodada — ver "Testes" a
 ## Ordem de ataque (nesta rodada: só o item 1)
 
 1. **Testes nas funções puras** (`calculations.ts`, `pricing.ts`, `format.ts`) — trava o
-   comportamento atual e dá rede de segurança para as correções. ✅ feito nesta rodada.
-2. F1 — modelo de snapshot: editar preserva custos; só "Reavaliar" atualiza (remover aviso enganoso).
-3. F2 — breakdown coerente com líquido desejado.
+   comportamento atual e dá rede de segurança para as correções. ✅ feito (PR #1).
+2. F1 — modelo de snapshot: editar preserva custos; só "Reavaliar" atualiza. ✅ feito (PR #1).
+3. F2 — breakdown coerente com líquido desejado. ✅ feito (PR #2).
 4. F3 — materiais leves: alinhar rateio com o doc **junto com a Gabriela** (muda preço de venda).
 5. F4 — recalcular derivados quando settings mudarem (ou avisar).
 6. (Depois) H1–H6, M1–M8 conforme priorizar com a Gabriela.
