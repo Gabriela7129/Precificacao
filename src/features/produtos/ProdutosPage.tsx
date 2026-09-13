@@ -22,7 +22,7 @@ export function ProdutosPage() {
   const [deleteTarget, setDeleteTarget] = useState<WithId<Product> | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  const marketplacesById = useMemo(() => new Map(marketplaces.map((m) => [m.id, m.name])), [marketplaces])
+  const marketplacesById = useMemo(() => new Map(marketplaces.map((m) => [m.id, m])), [marketplaces])
   const activeProducts = useMemo(
     () => products.filter((p) => !p.isArchived).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
     [products],
@@ -97,7 +97,7 @@ export function ProdutosPage() {
             <ProductCard
               key={p.id}
               product={p}
-              marketplaceName={p.marketplaceId ? (marketplacesById.get(p.marketplaceId) ?? null) : null}
+              marketplace={p.marketplaceId ? (marketplacesById.get(p.marketplaceId) ?? null) : null}
               onClick={() => navigate(`/produtos/${p.id}`)}
               onDuplicate={() => void handleDuplicar(p)}
               duplicating={duplicandoId === p.id}

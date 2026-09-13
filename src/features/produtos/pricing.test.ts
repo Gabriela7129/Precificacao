@@ -73,15 +73,28 @@ describe('computePricing — líquido desejado (cálculo reverso, doc §5)', () 
     close(r.precoSemTaxas, 80) // F2: preço sem taxas É o líquido desejado
   })
 
-  // F2 CORRIGIDO: a identidade do breakdown agora fecha também com líquido
-  // desejado — precoSemTaxas (= o líquido) + taxaMarketplace = salePrice.
-  it('[F2 corrigido] breakdown fecha: preço sem taxas + taxa = preço de venda', () => {
+  // F2 CORRIGIDO: o preço sem taxas passa a ser a base real do cálculo (o
+  // líquido desejado) e a margem exibida é a efetiva — o breakdown fecha.
+  // (Antes: exibia precoSemTaxas da margem (70) + taxa ≠ salePrice.)
+  it('[F2 corrigido] breakdown fecha no modo reverso: preço sem taxas + taxa = preço de venda', () => {
     const r = computePricing({ directCost: 50, profitMargin: 40, marketplace: shopee, desiredNetValue: 80 })
+    expect(r.modoReverso).toBe(true)
+    close(r.precoSemTaxas, 80) // a base real, não os 70 da margem
+    close(r.margemValor, 30) // margem efetiva: 80 − 50
+    close(r.precoSemTaxasMargem, 70) // referência preservada para a nota da UI
     close(r.precoSemTaxas + r.taxaMarketplace, r.salePrice) // 80 + 24 = 104 ✓
   })
 
-  // AUDITORIA M6: líquido desejado SEM marketplace é ignorado silenciosamente —
-  // o preço segue sendo custo × (1 + margem), sem nenhum aviso.
+  it('modo reverso só ativa com líquido desejado E marketplace', () => {
+    const semMarketplace = computePricing({ directCost: 50, profitMargin: 40, marketplace: null, desiredNetValue: 80 })
+    expect(semMarketplace.modoReverso).toBe(false)
+    const semLiquido = computePricing({ directCost: 50, profitMargin: 40, marketplace: shopee, desiredNetValue: null })
+    expect(semLiquido.modoReverso).toBe(false)
+    close(semLiquido.precoSemTaxas, 70) // caminho normal: base da margem
+  })
+
+  // AUDITORIA M6: líquido desejado SEM marketplace segue ignorado
+  // silenciosamente (sem aviso). O F2 não muda isso — decisão de escopo.
   it('[M6 caracterização] líquido desejado sem marketplace é ignorado', () => {
     const r = computePricing({ directCost: 50, profitMargin: 40, marketplace: null, desiredNetValue: 80 })
     close(r.salePrice, 70) // igual ao caso sem desiredNetValue
