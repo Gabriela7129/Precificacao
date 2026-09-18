@@ -11,6 +11,11 @@ const quantitySchema = z
 
 export const productFormSchema = z.object({
   name: z.string().min(2, 'Informe um nome com pelo menos 2 caracteres'),
+  /** Categoria do produto (obrigatória — Caderno, Amigurumi ou Outros). */
+  category: z.enum(['caderno', 'amigurumi', 'outros'], {
+    required_error: 'Escolha uma categoria',
+    invalid_type_error: 'Escolha uma categoria',
+  }),
   /** Insumos adicionados diretamente ao produto (detalhes pequenos). */
   supplies: z.array(
     z.object({

@@ -27,7 +27,8 @@ import {
   useSupplies,
   useHeavyAssets,
 } from '../../services/firestore'
-import type { HumanProfile, ProductComponentLine, ProductLightToolLine, ProductMachineLine, ProductPackagingLine, ProductSupplyLine } from '../../types'
+import type { HumanProfile, ProductCategory, ProductComponentLine, ProductLightToolLine, ProductMachineLine, ProductPackagingLine, ProductSupplyLine } from '../../types'
+import { categoriaDe } from './categoria'
 import { analisarLevesCompartilhados, hourlyRateForProfile, useProduct, useSettingsDoc } from './data'
 import { computePricing } from './pricing'
 import { productFormSchema, type ProductFormValues } from './schema'
@@ -40,6 +41,8 @@ const profileOptions = [
 
 const emptyDefaults: ProductFormValues = {
   name: '',
+  // Sem categoria pré-selecionada: a usuária precisa escolher uma na criação.
+  category: '' as ProductFormValues['category'],
   supplies: [],
   components: [],
   packaging: [],
@@ -118,6 +121,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
     if (mode !== 'edit' || !product) return
     reset({
       name: product.name,
+      category: categoriaDe(product),
       supplies: (product.supplies ?? []).map((l) => ({ supplyId: l.supplyId, quantity: l.quantity, unitCostSnapshot: l.unitCostSnapshot })),
       components: product.components.map((l) => ({ componentId: l.componentId, quantity: l.quantity, unitCostSnapshot: l.unitCostSnapshot })),
       packaging: product.packaging.map((l) => ({ componentId: l.componentId ?? l.supplyId, quantity: l.quantity, unitCostSnapshot: l.unitCostSnapshot })),
@@ -231,6 +235,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
     try {
       const payload = {
         name: formValues.name.trim(),
+        category: formValues.category,
         supplies: live.supplyLines,
         components: live.componentLines,
         packaging: live.packagingLines,
@@ -300,6 +305,37 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                 <FieldLabel htmlFor="name">Nome do produto</FieldLabel>
                 <Input id="name" placeholder="Ex.: Caderno A5 Capa Dura" error={!!errors.name} {...register('name')} />
                 {errors.name && <FieldError>{errors.name.message}</FieldError>}
+
+                {/* Categoria — escolha única obrigatória (Caderno, Amigurumi ou Outros) */}
+                <div className="mt-4 pt-4 border-t border-rose-100">
+                  <FieldLabel>Categoria</FieldLabel>
+                  <div className="flex flex-wrap gap-4 mt-1">
+                    {(['caderno', 'amigurumi', 'outros'] as ProductCategory[]).map((cat) => {
+                      const checked = watch('category') === cat
+                      return (
+                        <label
+                          key={cat}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition select-none ${
+                            checked
+                              ? 'border-rose-400 bg-rose-50 text-rose-700'
+                              : 'border-rose-200 bg-white text-gray-600 hover:bg-rose-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 accent-rose-500"
+                            checked={checked}
+                            onChange={() => setValue('category', cat, { shouldValidate: true, shouldDirty: true })}
+                          />
+                          <span className="text-sm font-medium">
+                            {cat === 'caderno' ? 'Caderno' : cat === 'amigurumi' ? 'Amigurumi' : 'Outros'}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  {errors.category && <FieldError>{errors.category.message}</FieldError>}
+                </div>
               </Card>
 
               {/* Componentes semi-acabados */}

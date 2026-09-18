@@ -246,9 +246,14 @@ export interface ProductPackagingLine {
   unitCostSnapshot: number
 }
 
+/** Categoria do produto final (divisão da lista de produtos). */
+export type ProductCategory = 'caderno' | 'amigurumi' | 'outros'
+
 export interface Product {
   workspaceId: string
   name: string
+  /** Categoria do produto. Documentos legados não têm — tratados como 'outros'. */
+  category?: ProductCategory
   components: ProductComponentLine[]
   packaging: ProductPackagingLine[]
   /** Insumos diretos no produto (opcional — produtos antigos não têm). */
