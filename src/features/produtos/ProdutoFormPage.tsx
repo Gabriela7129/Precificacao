@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Controller, useFieldArray, useForm } from 'react-hook-form'
+import { Controller, useFieldArray, useForm, type FieldErrors } from 'react-hook-form'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button } from '../../components/ui/Button'
@@ -60,6 +60,46 @@ interface ProdutoFormPageProps {
   mode: 'create' | 'edit'
 }
 
+type LineError = { message?: string } | undefined
+interface RowErrors {
+  supplyId?: LineError
+  componentId?: LineError
+  assetId?: LineError
+  toolId?: LineError
+  quantity?: LineError
+  timeMinutes?: LineError
+}
+
+/**
+ * Converte os erros de validação em mensagens legíveis para o aviso de
+ * "não foi possível salvar" (toast + painel abaixo do botão Salvar).
+ */
+function mensagensDeErro(errs: FieldErrors<ProductFormValues>): string[] {
+  const msgs: string[] = []
+  if (errs.name) msgs.push('Nome do produto é obrigatório.')
+  if (errs.category) msgs.push('Escolha uma categoria (Caderno, Amigurumi ou Outros).')
+
+  const secao = (
+    label: string,
+    linhas: (RowErrors | undefined)[] | undefined,
+    idKey: 'supplyId' | 'componentId' | 'assetId' | 'toolId',
+    extraKey: 'quantity' | 'timeMinutes',
+  ) => {
+    linhas?.forEach((e, i) => {
+      if (!e) return
+      if (e[idKey]?.message) msgs.push(`${label} — linha ${i + 1}: ${e[idKey]?.message}`)
+      else if (e[extraKey]?.message) msgs.push(`${label} — linha ${i + 1} (quantidade): ${e[extraKey]?.message}`)
+    })
+  }
+
+  secao('Componentes', errs.components as (RowErrors | undefined)[], 'componentId', 'quantity')
+  secao('Embalagem', errs.packaging as (RowErrors | undefined)[], 'componentId', 'quantity')
+  secao('Insumos', errs.supplies as (RowErrors | undefined)[], 'supplyId', 'quantity')
+  secao('Ativos pesados', errs.machineAssets as (RowErrors | undefined)[], 'assetId', 'timeMinutes')
+  secao('Materiais leves', errs.lightTools as (RowErrors | undefined)[], 'toolId', 'quantity')
+  return msgs
+}
+
 /** Formulário de produto em duas colunas (design.md 5.13): composição + precificação ao vivo. */
 function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
   const navigate = useNavigate()
@@ -76,6 +116,8 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
 
   const [saving, setSaving] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
+  /** Mensagens de validação exibidas após tentativa de salvar com campos faltando. */
+  const [saveErrors, setSaveErrors] = useState<string[]>([])
 
   const activeComponents = useMemo(() => components.filter((c) => !c.isArchived && !c.isPackaging), [components])
   const packagingComponents = useMemo(() => components.filter((c) => !c.isArchived && c.isPackaging), [components])
@@ -232,6 +274,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
 
   const onSubmit = async (formValues: ProductFormValues) => {
     setSaving(true)
+    setSaveErrors([])
     try {
       const payload = {
         name: formValues.name.trim(),
@@ -266,6 +309,16 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
     }
   }
 
+  /** Submit com validação reprovada: avisa o que está faltando (toast + painel). */
+  const onInvalid = (errs: FieldErrors<ProductFormValues>) => {
+    const msgs = mensagensDeErro(errs)
+    setSaveErrors(msgs.length > 0 ? msgs : ['Verifique os campos destacados em vermelho.'])
+    toast.error(msgs[0] ?? 'Não foi possível salvar: faltam informações no formulário.', {
+      description: msgs.length > 1 ? `+ ${msgs.length - 1} outro(s) campo(s) com problema.` : undefined,
+      duration: 6000,
+    })
+  }
+
   const firstLoading =
     loadingComponents || loadingMarketplaces || loadingSupplies || (mode === 'edit' && loadingProduct)
 
@@ -297,7 +350,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
           <Skeleton className="h-96 w-full" />
         </div>
       ) : (
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit, onInvalid)}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Coluna esquerda — composição */}
             <div className="lg:col-span-2 space-y-6">
@@ -372,6 +425,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                                   onChange(next)
                                 }}
                                 placeholder="Selecione um componente"
+                                error={!!errors.components?.[index]?.componentId}
                               />
                             )}
                           />
@@ -457,6 +511,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                                   onChange(next)
                                 }}
                                 placeholder="Selecione uma embalagem"
+                                error={!!errors.packaging?.[index]?.componentId}
                               />
                             )}
                           />
@@ -549,6 +604,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                                   onChange(next)
                                 }}
                                 placeholder="Selecione um insumo"
+                                error={!!errors.supplies?.[index]?.supplyId}
                               />
                             )}
                           />
@@ -640,6 +696,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                                   onChange(next)
                                 }}
                                 placeholder="Selecione um ativo"
+                                error={!!errors.machineAssets?.[index]?.assetId}
                               />
                             )}
                           />
@@ -729,6 +786,7 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                                   onChange(next)
                                 }}
                                 placeholder="Selecione um material leve"
+                                error={!!errors.lightTools?.[index]?.toolId}
                               />
                             )}
                           />
@@ -897,6 +955,18 @@ function ProdutoFormPage({ mode }: ProdutoFormPageProps) {
                 <Button type="button" variant="secondary" className="w-full" onClick={handleCancel} disabled={saving}>
                   Cancelar
                 </Button>
+                {saveErrors.length > 0 && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                    <p className="text-sm font-medium text-red-700 mb-1">
+                      Não foi possível salvar — verifique o que falta:
+                    </p>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      {saveErrors.map((msg, i) => (
+                        <li key={i} className="text-xs text-red-600">{msg}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </Card>
             </div>
           </div>

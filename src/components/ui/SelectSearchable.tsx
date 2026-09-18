@@ -14,6 +14,8 @@ export interface SelectSearchableProps {
   emptyLabel?: string
   disabled?: boolean
   id?: string
+  /** Borda vermelha quando o campo está com erro de validação. */
+  error?: boolean
 }
 
 export function SelectSearchable({
@@ -24,6 +26,7 @@ export function SelectSearchable({
   emptyLabel = 'Nenhuma opção encontrada',
   disabled = false,
   id,
+  error = false,
 }: SelectSearchableProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -78,7 +81,13 @@ export function SelectSearchable({
           'w-full flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm bg-white transition',
           'focus:outline-none focus:ring-2 focus:ring-rose-200 focus:border-rose-400',
           disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'text-gray-900 hover:border-rose-300',
-          open ? 'border-rose-400 ring-2 ring-rose-200' : 'border-gray-200',
+          open
+            ? error
+              ? 'border-red-400 ring-2 ring-red-200'
+              : 'border-rose-400 ring-2 ring-rose-200'
+            : error
+              ? 'border-red-400'
+              : 'border-gray-200',
         ].join(' ')}
         aria-haspopup="listbox"
         aria-expanded={open}
