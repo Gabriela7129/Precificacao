@@ -12,7 +12,7 @@
  */
 
 import { useState } from 'react'
-import { Controller, useFieldArray, useForm } from 'react-hook-form'
+import { Controller, useFieldArray, useForm, type FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
@@ -81,6 +81,44 @@ const componentFormSchema = z.object({
 
 type ComponentFormValues = z.infer<typeof componentFormSchema>
 
+type LineError = { message?: string } | undefined
+interface RowErrors {
+  supplyId?: LineError
+  assetId?: LineError
+  toolId?: LineError
+  quantity?: LineError
+  timeMinutes?: LineError
+}
+
+/**
+ * Converte os erros de validação em mensagens legíveis para o aviso de
+ * "não foi possível salvar" (toast + painel abaixo do botão Salvar) —
+ * mesmo padrão do formulário de produtos.
+ */
+function mensagensDeErro(errs: FieldErrors<ComponentFormValues>): string[] {
+  const msgs: string[] = []
+  if (errs.name) msgs.push('Nome do componente é obrigatório.')
+
+  const secao = (
+    label: string,
+    linhas: (RowErrors | undefined)[] | undefined,
+    idKey: 'supplyId' | 'assetId' | 'toolId',
+    extraKey: 'quantity' | 'timeMinutes',
+  ) => {
+    linhas?.forEach((e, i) => {
+      if (!e) return
+      if (e[idKey]?.message) msgs.push(`${label} — linha ${i + 1}: ${e[idKey]?.message}`)
+      else if (e[extraKey]?.message)
+        msgs.push(`${label} — linha ${i + 1} (quantidade): ${e[extraKey]?.message}`)
+    })
+  }
+
+  secao('Insumos', errs.supplies as (RowErrors | undefined)[], 'supplyId', 'quantity')
+  secao('Ativo pesado', errs.machineAssets as (RowErrors | undefined)[], 'assetId', 'timeMinutes')
+  secao('Materiais leves', errs.lightTools as (RowErrors | undefined)[], 'toolId', 'quantity')
+  return msgs
+}
+
 // ---------------------------------------------------------------------------
 // Página de composição (criação quando `componente` é ausente)
 // ---------------------------------------------------------------------------
@@ -103,6 +141,8 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
   const [reavaliando, setReavaliando] = useState(false)
   const [confirmArquivar, setConfirmArquivar] = useState(false)
   const [arquivando, setArquivando] = useState(false)
+  /** Mensagens de validação exibidas após tentativa de salvar com campos faltando. */
+  const [saveErrors, setSaveErrors] = useState<string[]>([])
 
   const handleArquivar = async () => {
     if (!wsId || !componente) return
@@ -203,8 +243,10 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
 
   const humanHourlyRate = custo.humanHourlyRate
 
-  const onSubmit = handleSubmit(async (formValues) => {
+  const onSubmit = handleSubmit(
+    async (formValues) => {
     if (!wsId) return
+    setSaveErrors([])
     try {
       const payload = {
         name: formValues.name.trim(),
@@ -227,7 +269,17 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
     } catch {
       toast.error('Não foi possível salvar. Tente novamente.')
     }
-  })
+  },
+  /** Submit com validação reprovada: avisa o que está faltando (toast + painel). */
+  (errs) => {
+    const msgs = mensagensDeErro(errs as FieldErrors<ComponentFormValues>)
+    setSaveErrors(msgs.length > 0 ? msgs : ['Verifique os campos destacados em vermelho.'])
+    toast.error(msgs[0] ?? 'Não foi possível salvar: faltam informações no formulário.', {
+      description: msgs.length > 1 ? `+ ${msgs.length - 1} outro(s) campo(s) com problema.` : undefined,
+      duration: 6000,
+    })
+  },
+  )
 
   const handleReavaliar = async () => {
     if (!wsId || !componente) return
@@ -333,6 +385,7 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                                   onChange(next)
                                 }}
                                 placeholder="Selecione um insumo"
+                                error={!!errors.supplies?.[index]?.supplyId}
                               />
                             )}
                           />
@@ -420,6 +473,7 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                                   onChange(next)
                                 }}
                                 placeholder="Selecione um ativo"
+                                error={!!errors.machineAssets?.[index]?.assetId}
                               />
                             )}
                           />
@@ -507,6 +561,7 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                                   onChange(next)
                                 }}
                                 placeholder="Selecione um material leve"
+                                error={!!errors.lightTools?.[index]?.toolId}
                               />
                             )}
                           />
@@ -651,6 +706,18 @@ export function ComponenteFormPage({ componente, isPackagingInicial = false }: C
                 >
                   Cancelar
                 </Button>
+                {saveErrors.length > 0 && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                    <p className="text-sm font-medium text-red-700 mb-1">
+                      Não foi possível salvar — verifique o que falta:
+                    </p>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      {saveErrors.map((msg, i) => (
+                        <li key={i} className="text-xs text-red-600">{msg}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </Card>
             )}
           </div>
