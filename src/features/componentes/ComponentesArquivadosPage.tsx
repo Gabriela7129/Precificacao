@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { CardsSkeleton, ConfirmDialog, EmptyState, SearchInput } from '../../components/ui'
 import { updateComponent, useActiveWorkspaceId, useSemiFinishedComponents } from '../../services/firestore'
+import { matchesSearch } from '../../lib/search'
 import { ComponentCard } from './components/ComponentCard'
 
 export function ComponentesArquivadosPage() {
@@ -20,10 +21,9 @@ export function ComponentesArquivadosPage() {
   const [restoring, setRestoring] = useState(false)
 
   const archived = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase('pt-BR')
     return data
       .filter((c) => c.isArchived)
-      .filter((c) => !term || c.name.toLocaleLowerCase('pt-BR').includes(term))
+      .filter((c) => matchesSearch(c.name, query))
       .sort(
         (a, b) =>
           a.name.localeCompare(b.name, 'pt-BR') || b.version - a.version,

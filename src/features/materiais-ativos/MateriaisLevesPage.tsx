@@ -25,6 +25,7 @@ import {
 } from '../../components/ui'
 import { DEFAULT_LIGHT_MAINTENANCE_RATE, lightToolMonthlyMaintenance } from '../../lib/calculations'
 import { formatBRL, formatDate, formatPercent } from '../../lib/format'
+import { matchesSearch } from '../../lib/search'
 import { deleteLightTool, useActiveWorkspaceId, useLightTools, createLightTool } from '../../services/firestore'
 import type { LightTool, WithId } from '../../types'
 import { useWorkspaceSettings } from './data'
@@ -47,9 +48,9 @@ export function MateriaisLevesPage() {
   const maintenanceRate = settings?.lightMaintenanceRate ?? DEFAULT_LIGHT_MAINTENANCE_RATE
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
     const sorted = [...tools].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-    return q ? sorted.filter((tool) => tool.name.toLowerCase().includes(q)) : sorted
+    // Busca ignora acentos e maiúsculas (ex.: "regua" encontra "Régua").
+    return query.trim() ? sorted.filter((tool) => matchesSearch(tool.name, query)) : sorted
   }, [tools, query])
 
   // Resumo do topo: sempre sobre TODOS os itens (independente da busca).

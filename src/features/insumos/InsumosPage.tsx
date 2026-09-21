@@ -26,6 +26,7 @@ import {
   TR,
 } from '../../components/ui'
 import { formatBRL, formatDate, formatNumber } from '../../lib/format'
+import { matchesSearch } from '../../lib/search'
 import {
   createSupply,
   createSupplyCategory,
@@ -93,11 +94,11 @@ export function InsumosPage() {
   )
 
   const filteredSupplies = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase('pt-BR')
     return supplies
       .filter((supply) => {
         if (categoryFilter && supply.categoryId !== categoryFilter) return false
-        if (term && !supply.name.toLocaleLowerCase('pt-BR').includes(term)) return false
+        // Busca ignora acentos e maiúsculas (ex.: "regua" encontra "Régua").
+        if (!matchesSearch(supply.name, search)) return false
         return true
       })
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))

@@ -22,6 +22,7 @@ import {
   TR,
 } from '../../components/ui'
 import { formatBRL, formatNumber } from '../../lib/format'
+import { matchesSearch } from '../../lib/search'
 import { deleteHeavyAsset, useActiveWorkspaceId, useHeavyAssets } from '../../services/firestore'
 import type { HeavyAsset, WithId } from '../../types'
 import { useWorkspaceSettings } from './data'
@@ -48,9 +49,9 @@ export function AtivosPesadosPage() {
   const defaultElectricityRate = settings?.electricityRate ?? null
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
     const sorted = [...assets].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-    return q ? sorted.filter((asset) => asset.name.toLowerCase().includes(q)) : sorted
+    // Busca ignora acentos e maiúsculas (ex.: "regua" encontra "Régua").
+    return query.trim() ? sorted.filter((asset) => matchesSearch(asset.name, query)) : sorted
   }, [assets, query])
 
   const openCreate = () => {

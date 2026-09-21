@@ -10,6 +10,7 @@ import { SearchInput } from '../../components/ui/SearchInput'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { useActiveWorkspaceId, useMarketplaces, useProducts } from '../../services/firestore'
 import type { Product, WithId } from '../../types'
+import { matchesSearch } from '../../lib/search'
 import { categoriaDe } from './categoria'
 import { ProductCard } from './components/ProductCard'
 import { duplicarProduto, excluirProduto } from './data'
@@ -30,7 +31,6 @@ export function ProdutosPage() {
 
   const marketplacesById = useMemo(() => new Map(marketplaces.map((m) => [m.id, m])), [marketplaces])
   const activeProducts = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase('pt-BR')
     return products
       .filter((p) => {
         if (p.isArchived) return false
@@ -38,7 +38,7 @@ export function ProdutosPage() {
         if (view === 'amigurumis') return categoriaDe(p) === 'amigurumi'
         return true
       })
-      .filter((p) => !term || p.name.toLocaleLowerCase('pt-BR').includes(term))
+      .filter((p) => matchesSearch(p.name, query))
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
   }, [products, view, query])
 

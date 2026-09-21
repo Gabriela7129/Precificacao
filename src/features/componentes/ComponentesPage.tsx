@@ -10,6 +10,7 @@ import { Archive, Package, Search, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, CardsSkeleton, ConfirmDialog, EmptyState, PageHeader, SearchInput } from '../../components/ui'
 import { useActiveWorkspaceId, useProducts, useSemiFinishedComponents } from '../../services/firestore'
+import { matchesSearch } from '../../lib/search'
 import { duplicarComponente, excluirComponente } from './data'
 import { ComponentCard } from './components/ComponentCard'
 
@@ -72,12 +73,11 @@ export function ComponentesPage() {
     : 0
 
   const ativos = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase('pt-BR')
     return data
       .filter((c) =>
         !c.isArchived && (view === 'embalagens' ? c.isPackaging === true : !c.isPackaging),
       )
-      .filter((c) => !term || c.name.toLocaleLowerCase('pt-BR').includes(term))
+      .filter((c) => matchesSearch(c.name, query))
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
   }, [data, view, query])
 

@@ -1,5 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { ChevronDown, Search, X } from 'lucide-react'
+import { matchesSearch } from '../../lib/search'
 
 export interface SelectSearchableOption {
   value: string
@@ -36,9 +37,10 @@ export function SelectSearchable({
   const selected = useMemo(() => options.find((o) => o.value === value), [options, value])
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = query.trim()
     if (!q) return options
-    return options.filter((o) => o.label.toLowerCase().includes(q))
+    // Busca ignora acentos e maiúsculas (ex.: "regua" encontra "Régua").
+    return options.filter((o) => matchesSearch(o.label, q))
   }, [options, query])
 
   useEffect(() => {
